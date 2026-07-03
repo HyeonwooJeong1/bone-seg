@@ -1,0 +1,4 @@
+# 빌드 컨텍스트 최소화 — Dockerfile은 트레이너 .py 하나만 COPY하면 됨.
+# data/ (VSD 원본), nnunet/ (Dataset490 등) 대용량은 컨텍스트에서 제외(123GB→수 KB).
+*
+!nnUNetTrainerNoMirroring_ES.py
