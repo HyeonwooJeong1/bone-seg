@@ -46,29 +46,60 @@ def apps():
     return m
 
 
+def cmdline(pid):
+    """호스트 /proc에서 프로세스 전체 명령어 (컨테이너 프로세스도 호스트 PID로 보임)."""
+    try:
+        with open(f"/proc/{pid}/cmdline", "rb") as f:
+            return f.read().replace(b"\x00", b" ").decode(errors="replace")
+    except Exception:
+        return ""
+
+
+def classify(procs):
+    """GPU에서 도는 프로세스들을 보고 상태 판정: 학습 / 스트레스 / 기타 / 여유."""
+    kinds = set()
+    for p, _n, _m in procs:
+        cl = cmdline(p).lower()
+        if "gpu_keepalive" in cl:
+            kinds.add("스트레스")
+        elif "nnunetv2_train" in cl or "nnunet" in cl or "run_all.sh" in cl:
+            kinds.add("학습")
+        elif "predict" in cl or "infer" in cl:
+            kinds.add("추론")
+        elif cl.strip():
+            kinds.add("기타")
+    if not kinds:
+        return "여유"
+    # 우선순위: 학습 > 추론 > 스트레스 > 기타
+    for k in ("학습", "추론", "스트레스", "기타"):
+        if k in kinds:
+            return k
+    return "기타"
+
+
 def render():
     g = gpus(); a = apps()
     L = []
-    L.append("=" * 90)
+    L.append("=" * 96)
     L.append(f" 서버 GPU 실시간 현황   ({time.strftime('%Y-%m-%d %H:%M:%S')})   H100 80GB x {len(g)}")
-    L.append("=" * 90)
-    L.append(f" {'GPU':>3} {'util':>6} {'mem(used/total)':>17} {'온도':>5} {'전력':>6}  프로세스(pid,mem)")
-    L.append("-" * 90)
+    L.append("=" * 96)
+    L.append(f" {'GPU':>3} {'util':>6} {'mem(used/total)':>17} {'온도':>5} {'전력':>6} "
+             f"{'상태':>8}  프로세스(pid)")
+    L.append("-" * 96)
     free = []
     for x in g:
         procs = a.get(x["uuid"], [])
         used = int(x["mu"] or 0)
-        if used <= FREE_MEM_MB:
+        state = classify(procs)
+        if used <= FREE_MEM_MB and state == "여유":
             free.append(str(x["idx"]))
-        pstr = ", ".join(f"{n}({p},{mm}MB)" for p, n, mm in procs) if procs else "-"
-        tag = "  ← 여유" if used <= FREE_MEM_MB else ""
+        pstr = ", ".join(f"{n}({p})" for p, n, mm in procs) if procs else "-"
         L.append(f" {x['idx']:>3} {x['util']+'%':>6} {x['mu']+'/'+x['mt']+'MB':>17} "
-                 f"{x['temp']+'C':>5} {x['pw']+'W':>6}  {pstr[:40]}{tag}")
-    L.append("=" * 90)
+                 f"{x['temp']+'C':>5} {x['pw']+'W':>6} {state:>8}  {pstr[:34]}")
+    L.append("=" * 96)
+    L.append(" 상태:  학습=실제 모델 학습 · 추론=예측 · 스트레스=keepalive(회수방지용) · 기타 · 여유")
     L.append(f" 여유 GPU: {', '.join(free) if free else '없음'}"
-             f"     keepalive:  sudo docker run -d --name gpu-keep-<이름> --gpus all \\")
-    L.append("             -v /data1:/data1 bone-nnunet:2.8.1 "
-             "python /data1/shared/gpu/gpu_keepalive.py <GPU번호>")
+             f"   ·  keepalive 실행/종료법은 /data1/shared/gpu/README.md")
     return "\n".join(L)
 
 
