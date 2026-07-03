@@ -1,0 +1,26 @@
+# === 대용량 데이터 / 의료 개인정보 (커밋 금지) ===
+11423945/
+11423945.zip
+*.zip
+results/
+mako_pred/
+backup_marching_cubes_*/
+TotalSegmentator-master/
+%programdata%/
+capture.png
+
+# nnU-Net raw/preprocessed 데이터셋 & VSD 원본
+ai_bone/data/
+ai_bone/nnunet/
+
+# === 파이썬 캐시 ===
+__pycache__/
+*.pyc
+*.pyo
+
+# === 비밀 / 키 ===
+*.pem
+*.key
+
+# === 오피스 임시 잠금파일 ===
+~$*
