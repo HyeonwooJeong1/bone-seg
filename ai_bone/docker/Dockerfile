@@ -3,7 +3,7 @@
 # torch 2.5.1+cu124 → H100(sm_90)/드라이버 580에서 동작. 데이터 포맷은 nnunetv2 버전에 의존.
 FROM pytorch/pytorch:2.5.1-cuda12.4-cudnn9-runtime
 
-RUN pip install --no-cache-dir nnunetv2==2.8.1
+RUN pip install --no-cache-dir nnunetv2==2.8.1 pydicom nibabel
 
 # 좌우 라벨용 커스텀 트레이너(NoMirroring + early stopping)를 설치 패키지에 삽입
 # (build context = ai_bone/ 이므로 파일이 최상위에 있음)
