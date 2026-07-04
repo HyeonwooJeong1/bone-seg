@@ -546,6 +546,18 @@ class LandmarksMixin:
         self.measurement_actors.clear()
 
 
+    def _update_landmark_selection_color(self, selected_rows):
+        """Recolor landmark spheres: selected → yellow, others → red."""
+        sel = set(selected_rows)
+        for i, actor in enumerate(getattr(self, 'landmark_actors', [])):
+            if actor is None:
+                continue
+            try:
+                col = (1.0, 1.0, 0.0) if i in sel else (1.0, 0.05, 0.05)
+                actor.GetProperty().SetColor(*col)
+            except Exception:
+                pass
+
     def _on_landmark_selection_changed(self):
         if self._suppress_table_signal:
             return
@@ -555,6 +567,10 @@ class LandmarksMixin:
         rows = sorted({idx.row() for idx in sel_model.selectedRows()})
         # Filter out invalid rows defensively
         rows = [r for r in rows if 0 <= r < len(self.landmark_data)]
+
+        # Highlight the selected landmark spheres (yellow) so you can see which
+        # point is selected; unselected ones go back to red.
+        self._update_landmark_selection_color(rows)
 
         self._clear_measurement_visualization()
 
