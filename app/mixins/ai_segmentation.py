@@ -145,21 +145,28 @@ class AiSegmentationMixin:
         dlg.show()
         QApplication.processEvents()
         self._ai_busy = True
+        # 출력은 로그 파일로 보냄 — PIPE를 안 읽으면 버퍼가 차서 추론이 멈추므로(중요!)
+        logpath = npz + ".log"
         try:
-            proc = subprocess.Popen(cmd, stdout=subprocess.PIPE,
-                                    stderr=subprocess.PIPE, text=True)
-            while proc.poll() is None:      # GUI 응답 유지하며 대기
-                QApplication.processEvents()
-                time.sleep(0.1)
-            _, err = proc.communicate()
+            with open(logpath, "w", encoding="utf-8", errors="replace") as lf:
+                proc = subprocess.Popen(cmd, stdout=lf, stderr=subprocess.STDOUT)
+                while proc.poll() is None:      # GUI 응답 유지하며 대기
+                    QApplication.processEvents()
+                    time.sleep(0.1)
         finally:
             self._ai_busy = False
             dlg.close()
         if proc.returncode != 0 or not os.path.exists(npz):
+            err = ""
+            try:
+                with open(logpath, encoding="utf-8", errors="replace") as lf:
+                    err = lf.read()[-1500:]
+            except Exception:
+                pass
             if not silent:
                 QMessageBox.critical(
                     self, "AI 분할 실패",
-                    f"추론 실패 (code {proc.returncode}).\n\n{(err or '')[-1500:]}")
+                    f"추론 실패 (code {proc.returncode}).\n\n{err}")
             self.statusBar().showMessage("AI 추론 실패", 5000)
             return None
         self.statusBar().showMessage("AI 추론 완료", 4000)

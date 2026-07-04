@@ -194,7 +194,7 @@ def run_predict(in_dir, out_dir, model_dir, folds, device):
     predictor = nnUNetPredictor(
         tile_step_size=0.7, use_gaussian=True, use_mirroring=False,
         perform_everything_on_device=(dev.type == "cuda"),
-        device=dev, verbose=False, verbose_preprocessing=False, allow_tqdm=True)
+        device=dev, verbose=False, verbose_preprocessing=False, allow_tqdm=False)
     predictor.initialize_from_trained_model_folder(
         model_folder, use_folds=tuple(int(f) for f in folds),
         checkpoint_name="checkpoint_final.pth")
