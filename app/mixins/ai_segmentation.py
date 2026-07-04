@@ -14,9 +14,10 @@ import os
 import json
 import subprocess
 import sys
+import time
 
 import numpy as np
-from PyQt5.QtWidgets import QMessageBox, QApplication
+from PyQt5.QtWidgets import QMessageBox, QApplication, QProgressDialog
 from PyQt5.QtCore import Qt
 
 
@@ -86,6 +87,8 @@ class AiSegmentationMixin:
         silent=True → 팝업 없이 실패 시 조용히 None 반환(자동 로드용).
         cache_only=True → 캐시가 있으면 그 경로, 없으면 추론하지 않고 None(자동 로드용).
         """
+        if getattr(self, "_ai_busy", False):
+            return None       # 이미 추론 중 → 중복 실행 방지
         npz = self._ai_npz_path()
         if npz is None:
             if not silent:
@@ -105,31 +108,58 @@ class AiSegmentationMixin:
                 QMessageBox.critical(self, "AI 분할", f"추론 스크립트 없음:\n{script}")
             return None
 
+        # 추론 런타임 확인 (torch/nnunetv2). 없으면 안내하고 중단(캐시 환자는 계속 동작).
+        try:
+            import importlib.util
+            has_nnunet = importlib.util.find_spec("nnunetv2") is not None
+        except Exception:
+            has_nnunet = False
+        if not has_nnunet:
+            if not silent:
+                QMessageBox.information(
+                    self, "AI 추론 환경 필요",
+                    "이 환경에는 AI 추론 런타임(torch/nnunetv2)이 없습니다.\n"
+                    "새 CT 자동 분할은 setup_and_run.bat로 만든 환경에서 실행하세요.\n"
+                    "(이미 분할된 환자는 캐시로 바로 표시됩니다.)")
+            return None
+
         # device·folds 자동
         device = "cpu"
         try:
             import torch
             device = "cuda" if torch.cuda.is_available() else "cpu"
         except Exception:
-            pass
+            device = "cpu"
         if folds is None:
             folds = "0,1,2,3,4" if device == "cuda" else "0"
 
         cmd = [sys.executable, script, dicom_dir, npz,
                "--folds", str(folds), "--device", device]
-        self.statusBar().showMessage(
-            f"AI 추론 중… (device={device}, folds={folds}) — 수 분 소요", 0)
-        QApplication.setOverrideCursor(Qt.WaitCursor)
+        dlg = QProgressDialog(
+            f"AI 뼈 분할 추론 중… (device={device})\n처음 1회는 수 분 걸릴 수 있습니다.",
+            None, 0, 0, self)
+        dlg.setWindowTitle("AI 분할")
+        dlg.setWindowModality(Qt.WindowModal)
+        dlg.setCancelButton(None)
+        dlg.setMinimumDuration(0)
+        dlg.show()
         QApplication.processEvents()
+        self._ai_busy = True
         try:
-            proc = subprocess.run(cmd, capture_output=True, text=True)
+            proc = subprocess.Popen(cmd, stdout=subprocess.PIPE,
+                                    stderr=subprocess.PIPE, text=True)
+            while proc.poll() is None:      # GUI 응답 유지하며 대기
+                QApplication.processEvents()
+                time.sleep(0.1)
+            _, err = proc.communicate()
         finally:
-            QApplication.restoreOverrideCursor()
+            self._ai_busy = False
+            dlg.close()
         if proc.returncode != 0 or not os.path.exists(npz):
             if not silent:
                 QMessageBox.critical(
                     self, "AI 분할 실패",
-                    f"추론 실패 (code {proc.returncode}).\n\n{proc.stderr[-1500:]}")
+                    f"추론 실패 (code {proc.returncode}).\n\n{(err or '')[-1500:]}")
             self.statusBar().showMessage("AI 추론 실패", 5000)
             return None
         self.statusBar().showMessage("AI 추론 완료", 4000)
@@ -186,8 +216,8 @@ class AiSegmentationMixin:
 
         auto=True(로드시 자동): 팝업 없이, 실패하면 조용히 기존 렌더 유지.
         """
-        # 자동(로드시)엔 캐시 있을 때만; 버튼 클릭(auto=False)이면 없으면 추론 실행
-        npz = self.run_ai_inference(silent=auto, cache_only=auto)
+        # 캐시 있으면 즉시, 없으면 추론 실행(자동 로드·버튼 모두). 실패 시 안내.
+        npz = self.run_ai_inference(silent=False, cache_only=False)
         if npz is None:
             return
         try:
