@@ -8,6 +8,16 @@ from PyQt5.QtWidgets import QFileDialog, QMessageBox
 from app.constants import BASE_DATA_DIR, SESSION_FORMAT, SESSION_VERSION
 
 class SessionIoMixin:
+    def _suggest_next_version(self):
+        """Suggest the next version label based on the last saved/loaded one."""
+        import re
+        last = getattr(self, '_last_session_version', None)
+        if last:
+            m = re.match(r'^v?(\d+)$', str(last).strip(), re.IGNORECASE)
+            if m:
+                return f"v{int(m.group(1)) + 1}"
+        return "v1"
+
     def on_save_session_clicked(self):
         if not self.all_series_data:
             QMessageBox.warning(self, "No Session", "Load a patient before saving a session.")
@@ -18,7 +28,20 @@ class SessionIoMixin:
                        if c.isalnum() or c in (' ', '-', '_')).strip() or 'patient'
         date_str = str(meta.get('study_date', ''))
         timestamp = datetime.now().strftime('%y%m%d_%H%M%S')
-        default_name = f"{name}_{date_str}_{timestamp}_session.json".replace("__", "_")
+
+        # Version label for managing revisions (auto-suggest the next version).
+        from PyQt5.QtWidgets import QInputDialog
+        suggested = self._suggest_next_version()
+        version, ok = QInputDialog.getText(
+            self, "Session Version",
+            "Version label (for managing revisions, e.g. v1, v2):",
+            text=suggested)
+        if not ok:
+            return
+        version = "".join(c for c in str(version)
+                          if c.isalnum() or c in ('-', '_', '.')).strip() or suggested
+
+        default_name = f"{name}_{date_str}_{version}_{timestamp}_session.json".replace("__", "_")
 
         path, _ = QFileDialog.getSaveFileName(
             self,
@@ -35,11 +58,13 @@ class SessionIoMixin:
             # mesh 파일들을 저장할 디렉토리
             mesh_dir = path.rsplit('.', 1)[0] + '_meshes'
             state = self._collect_session_state(mesh_dir=mesh_dir)
+            state['user_version'] = version
+            self._last_session_version = version
             import json
             with open(path, 'w', encoding='utf-8') as f:
                 json.dump(state, f, indent=2, ensure_ascii=False)
             QMessageBox.information(self, "Session Saved",
-                                    f"Session saved to:\n{path}")
+                                    f"Session ({version}) saved to:\n{path}")
         except Exception as e:
             import traceback; traceback.print_exc()
             QMessageBox.critical(self, "Save Failed", f"Could not save session:\n{e}")
@@ -75,8 +100,10 @@ class SessionIoMixin:
 
         try:
             self._apply_session_state(state, session_path=path)
+            ver = str(state.get('user_version', '')) or '—'
+            self._last_session_version = state.get('user_version', None)
             QMessageBox.information(self, "Session Loaded",
-                                    f"Restored session from:\n{path}")
+                                    f"Restored session ({ver}) from:\n{path}")
         except Exception as e:
             import traceback
             traceback.print_exc()
@@ -194,6 +221,7 @@ class SessionIoMixin:
                     'color': list(bone.get('color', (1, 1, 1))),
                     'voxel_count': int(bone.get('voxel_count', 0)),
                     'series_index': bone.get('series_index'),
+                    'source': bone.get('source', ''),   # 'ai' for AI-segmented bones
                     'mesh_file': mesh_file,
                     'raw_mesh_file': raw_file,
                 })
@@ -565,8 +593,18 @@ class SessionIoMixin:
             self._set_widget_value(self.merge_fill_iter_spinbox,
                                    self.merge_fill_iterations)
 
-        # 뼈 복원
+        # 뼈 복원 — AI로 분리한 뼈만 불러온다 (옛 HU/threshold 분리 뼈는 제외).
+        _AI_NAMES = {
+            "Femur_L", "Femur_R", "Hip_L", "Hip_R", "Sacrum", "Patella_L",
+            "Patella_R", "Tibia_L", "Tibia_R", "Fibula_L", "Fibula_R",
+            "Talus_L", "Talus_R", "Calcaneus_L", "Calcaneus_R", "Tarsals_L",
+            "Tarsals_R", "Metatarsals_L", "Metatarsals_R", "Phalanges_L", "Phalanges_R",
+        }
         for bone_state in sep.get('bones', []):
+            is_ai = (bone_state.get('source') == 'ai'
+                     or bone_state.get('name', '') in _AI_NAMES)
+            if not is_ai:
+                continue
             mesh = self._load_mesh_from_dir(mesh_dir,
                                             bone_state.get('mesh_file'))
             if mesh is None or mesh.n_points == 0:
@@ -598,6 +636,7 @@ class SessionIoMixin:
                 'voxel_count': int(bone_state.get('voxel_count', mesh.n_cells)),
                 'name': bone_state.get('name', 'Bone'),
                 'series_index': bone_state.get('series_index'),
+                'source': 'ai',
             }
             if raw_mesh is not None:
                 bone['raw_mesh'] = raw_mesh

@@ -328,6 +328,7 @@ class AiSegmentationMixin:
                     "voxel_count": int(mask.sum()),
                     "name": name,
                     "series_index": None,
+                    "source": "ai",   # mark AI bones so session load can filter
                 })
 
         if not self.separated_bones:
