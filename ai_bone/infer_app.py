@@ -83,7 +83,17 @@ def run_predict(in_dir, out_dir, model_dir, folds, device):
     env.setdefault("nnUNet_raw", model_dir)
     env.setdefault("nnUNet_preprocessed", model_dir)
     env["nnUNet_compile"] = "f"
-    cmd = ["nnUNetv2_predict", "-i", in_dir, "-o", out_dir,
+    # nnUNetv2_predict 실행파일을 현재 파이썬 환경에서 직접 탐색(PATH 미설정 대비)
+    exe_dir = os.path.dirname(sys.executable)
+    cands = [
+        os.path.join(exe_dir, "nnUNetv2_predict.exe"),
+        os.path.join(exe_dir, "nnUNetv2_predict"),
+        os.path.join(exe_dir, "Scripts", "nnUNetv2_predict.exe"),
+        os.path.join(exe_dir, "bin", "nnUNetv2_predict"),
+        "nnUNetv2_predict",
+    ]
+    predict_exe = next((c for c in cands if os.path.exists(c)), "nnUNetv2_predict")
+    cmd = [predict_exe, "-i", in_dir, "-o", out_dir,
            "-d", "490", "-c", "3d_fullres",
            "-p", "nnUNetPlans_iso06", "-tr", "nnUNetTrainerNoMirroring_ES",
            "-f", *[str(f) for f in folds], "-device", device]
