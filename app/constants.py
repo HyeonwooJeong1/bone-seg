@@ -1,5 +1,10 @@
 """Application-wide constants."""
 
+# Application (development) version. Bump this per milestone and tag it in git
+# (e.g. `git tag -a v1.1.0 -m "..."`). Shown in the window title and stored in
+# saved sessions for traceability.
+APP_VERSION = "1.0.0"
+
 BASE_DATA_DIR = "11423945"
 
 SESSION_FORMAT = "stanford_medicine_session"

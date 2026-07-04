@@ -8,16 +8,6 @@ from PyQt5.QtWidgets import QFileDialog, QMessageBox
 from app.constants import BASE_DATA_DIR, SESSION_FORMAT, SESSION_VERSION
 
 class SessionIoMixin:
-    def _suggest_next_version(self):
-        """Suggest the next version label based on the last saved/loaded one."""
-        import re
-        last = getattr(self, '_last_session_version', None)
-        if last:
-            m = re.match(r'^v?(\d+)$', str(last).strip(), re.IGNORECASE)
-            if m:
-                return f"v{int(m.group(1)) + 1}"
-        return "v1"
-
     def on_save_session_clicked(self):
         if not self.all_series_data:
             QMessageBox.warning(self, "No Session", "Load a patient before saving a session.")
@@ -28,20 +18,7 @@ class SessionIoMixin:
                        if c.isalnum() or c in (' ', '-', '_')).strip() or 'patient'
         date_str = str(meta.get('study_date', ''))
         timestamp = datetime.now().strftime('%y%m%d_%H%M%S')
-
-        # Version label for managing revisions (auto-suggest the next version).
-        from PyQt5.QtWidgets import QInputDialog
-        suggested = self._suggest_next_version()
-        version, ok = QInputDialog.getText(
-            self, "Session Version",
-            "Version label (for managing revisions, e.g. v1, v2):",
-            text=suggested)
-        if not ok:
-            return
-        version = "".join(c for c in str(version)
-                          if c.isalnum() or c in ('-', '_', '.')).strip() or suggested
-
-        default_name = f"{name}_{date_str}_{version}_{timestamp}_session.json".replace("__", "_")
+        default_name = f"{name}_{date_str}_{timestamp}_session.json".replace("__", "_")
 
         path, _ = QFileDialog.getSaveFileName(
             self,
@@ -58,13 +35,13 @@ class SessionIoMixin:
             # mesh 파일들을 저장할 디렉토리
             mesh_dir = path.rsplit('.', 1)[0] + '_meshes'
             state = self._collect_session_state(mesh_dir=mesh_dir)
-            state['user_version'] = version
-            self._last_session_version = version
+            from app.constants import APP_VERSION
+            state['app_version'] = APP_VERSION   # dev version that created this session
             import json
             with open(path, 'w', encoding='utf-8') as f:
                 json.dump(state, f, indent=2, ensure_ascii=False)
             QMessageBox.information(self, "Session Saved",
-                                    f"Session ({version}) saved to:\n{path}")
+                                    f"Session saved to:\n{path}")
         except Exception as e:
             import traceback; traceback.print_exc()
             QMessageBox.critical(self, "Save Failed", f"Could not save session:\n{e}")
@@ -100,10 +77,9 @@ class SessionIoMixin:
 
         try:
             self._apply_session_state(state, session_path=path)
-            ver = str(state.get('user_version', '')) or '—'
-            self._last_session_version = state.get('user_version', None)
+            ver = str(state.get('app_version', '')) or '—'
             QMessageBox.information(self, "Session Loaded",
-                                    f"Restored session ({ver}) from:\n{path}")
+                                    f"Restored session (app {ver}) from:\n{path}")
         except Exception as e:
             import traceback
             traceback.print_exc()
@@ -680,7 +656,7 @@ class SessionIoMixin:
                         (undo_entry.get('uid', ''), umesh)
                     )
 
-        # UI 활성화 (클릭 선택은 Restore Mode 토글 시점에 등록됨)
+        # UI 활성화
         self.bone_separation_enabled = True
         self._set_separation_tools_enabled(True)
         if hasattr(self, 'restore_undo_btn'):
@@ -689,12 +665,28 @@ class SessionIoMixin:
             self.clear_separation_btn.setEnabled(True)
         self._refresh_separation_list()
 
+        # Restored bones are AI bones → hide the ivory threshold volume so only
+        # the coloured AI bones remain (same as a fresh AI-first load), and turn
+        # on 3D click-to-select.
+        if self.separated_bones:
+            self.ai_segmentation_active = True
+            if hasattr(self, '_hide_volume_for_ai'):
+                self._hide_volume_for_ai()
+            if hasattr(self, '_enable_bone_click_selection'):
+                self._enable_bone_click_selection()
+        if hasattr(self, '_update_info_panel'):
+            self._update_info_panel()
+        try:
+            self.plotter.render()
+        except Exception:
+            pass
+
         n_bones = len(self.separated_bones)
         n_undo = len(self._restore_undo_stack)
         print(f"[Session] Restored {n_bones} bones, {n_undo} undo entries")
         if hasattr(self, 'separation_status_label'):
             self.separation_status_label.setText(
-                f"세션 복원: {n_bones}개 뼈, undo {n_undo}개"
+                f"Session restored: {n_bones} bone(s), {n_undo} undo"
             )
 
     # ===== Hover Preview (yellow sphere follows mouse) =====

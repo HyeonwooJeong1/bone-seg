@@ -60,7 +60,8 @@ class MainWindow(
 ):
     def __init__(self, parent=None):
         super(MainWindow, self).__init__(parent)
-        self.setWindowTitle("3D CT Bone Visualizer")
+        from app.constants import APP_VERSION
+        self.setWindowTitle(f"3D CT Bone Visualizer — v{APP_VERSION}")
         self.resize(1024, 768)
 
         # Main widget and layout
