@@ -1,0 +1,18 @@
+# AI 뼈 분할 포함 전체 의존성 (앱 GUI + nnU-Net 오프라인 추론)
+# torch는 CUDA(cu124) 빌드 — GPU 있으면 GPU 사용, 없으면 자동으로 CPU로 동작.
+--extra-index-url https://download.pytorch.org/whl/cu124
+
+# --- 앱 GUI ---
+PyQt5==5.15.10
+pydicom==2.4.4
+numpy==1.26.4
+scipy==1.13.1
+scikit-image==0.23.2
+pyvista==0.43.5
+pyvistaqt==0.11.0
+vtk==9.2.6
+matplotlib
+
+# --- AI 추론 (nnU-Net) ---
+torch==2.5.1
+nnunetv2==2.8.1

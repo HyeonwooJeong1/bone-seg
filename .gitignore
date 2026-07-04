@@ -13,6 +13,11 @@ capture.png
 ai_bone/data/
 ai_bone/nnunet/
 
+# 번들 모델(대용량 바이너리) · 환자 데이터 · AI 라벨 캐시
+models/
+11423945/
+*.npz
+
 # === 파이썬 캐시 ===
 __pycache__/
 *.pyc

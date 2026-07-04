@@ -53,9 +53,30 @@ def default_model_dir():
     return str(Path(__file__).resolve().parent.parent / "models")
 
 
+def ensure_trainer():
+    """번들된 커스텀 트레이너(nnUNetTrainerNoMirroring_ES)를 설치된 nnunetv2에 보장.
+
+    예측 시 nnU-Net이 이 트레이너 클래스를 import해 네트워크를 구성하므로,
+    없으면 번들 .py를 패키지에 복사한다(오프라인 자체완결).
+    """
+    src = os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                       "nnUNetTrainerNoMirroring_ES.py")
+    try:
+        import nnunetv2
+        dst_dir = os.path.join(os.path.dirname(nnunetv2.__file__),
+                               "training", "nnUNetTrainer")
+        dst = os.path.join(dst_dir, "nnUNetTrainerNoMirroring_ES.py")
+        if os.path.exists(src) and not os.path.exists(dst):
+            shutil.copy(src, dst)
+            print("[infer_app] ES 트레이너를 nnunetv2에 설치", flush=True)
+    except Exception as e:
+        print(f"[infer_app] 트레이너 설치 확인 실패(계속): {e}", flush=True)
+
+
 def run_predict(in_dir, out_dir, model_dir, folds, device):
     """번들 모델로 nnUNetv2_predict 실행 (subprocess)."""
     import subprocess
+    ensure_trainer()
     env = dict(os.environ)
     env["nnUNet_results"] = model_dir
     # predict엔 raw/preprocessed 불필요하지만 미설정 시 에러 → 존재 경로로 채움
