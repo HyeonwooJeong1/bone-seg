@@ -154,9 +154,13 @@ def run(dicom_dir, out_npz, folds, device, model_dir):
             # 스테이션 world z-범위 (origin z ~ aff[2,3], z-spacing ~ aff[2,2])
             nzz = lab_xyz.shape[2]
             z0 = float(aff[2, 3]); z1 = float(aff[2, 3] + aff[2, 2] * (nzz - 1))
+            # spacing (x,y,z) = 각 affine 열의 norm → 앱 (z,y,x) 순서로 저장
+            sp_xyz = np.sqrt((aff[:3, :3] ** 2).sum(axis=0))
             out[f"block{i}_label"] = lab_zyx
             out[f"block{i}_zrange"] = np.array([min(z0, z1), max(z0, z1)], dtype=np.float64)
             out[f"block{i}_shape"] = np.array(lab_zyx.shape, dtype=np.int64)
+            out[f"block{i}_spacing"] = np.array(
+                [sp_xyz[2], sp_xyz[1], sp_xyz[0]], dtype=np.float64)  # (z,y,x)
         np.savez_compressed(out_npz, **out)
         print(f"[infer_app] 저장: {out_npz} (블록 {n}개)", flush=True)
     finally:

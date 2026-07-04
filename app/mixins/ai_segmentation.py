@@ -52,6 +52,9 @@ class AiSegmentationMixin:
             "separate_btn", "clear_separation_btn",
             "sep_stage_a_checkbox", "closing_checkbox", "_closing_iter_widget",
             "fill_holes_checkbox", "_holes_size_widget", "min_bone_vox_spinbox",
+            # 시리즈/fusion 컨트롤 — AI가 전체 하지를 한 번에 표시하므로 불필요·충돌 방지
+            "fusion_checkbox", "series_combo", "series_include_section",
+            "mako_only_checkbox",
         ]
         for attr in legacy:
             w = getattr(self, attr, None)
@@ -139,11 +142,16 @@ class AiSegmentationMixin:
         id2name = json.loads(str(d["id2name"]))
         blocks = []
         for b in range(n):
-            blocks.append({
+            entry = {
                 "label": d[f"block{b}_label"],           # (nz,ny,nx) uint8
                 "zrange": tuple(float(x) for x in d[f"block{b}_zrange"]),
                 "shape": tuple(int(x) for x in d[f"block{b}_shape"]),
-            })
+                "spacing": None,
+            }
+            key = f"block{b}_spacing"
+            if key in d.files:
+                entry["spacing"] = tuple(float(x) for x in d[key])   # (z,y,x)
+            blocks.append(entry)
         return blocks, id2name
 
     def _match_ai_block(self, blocks):
@@ -188,13 +196,7 @@ class AiSegmentationMixin:
             if not auto:
                 QMessageBox.critical(self, "AI 분할", f"라벨 로드 실패:\n{e}")
             return
-        blk = self._match_ai_block(blocks)
-        if blk is None:
-            if not auto:
-                QMessageBox.warning(
-                    self, "AI 분할",
-                    "현재 시리즈에 맞는 AI 라벨 블록을 찾지 못했습니다.\n"
-                    "(다른 시리즈/스테이션을 선택해 보세요.)")
+        if not blocks:
             return
 
         # 기존 뼈/메시 actor 정리 + volume 숨김
@@ -202,40 +204,50 @@ class AiSegmentationMixin:
         self.separated_bones = []
         self._hide_volume_for_ai()
 
-        label = blk["label"]
+        # 모든 스테이션(블록)을 물리 z 위치에 배치 → 전체 하지 한 번에 표시.
+        # (블록마다 z-spacing이 다르므로 저장된 spacing 사용, 없으면 현재 시리즈 것)
         import pyvista as pv
-        ids = [int(x) for x in np.unique(label) if x > 0]
-        for cid in ids:
-            mask = (label == cid).astype(np.float32)
-            if mask.sum() < 50:
-                continue
-            grid = self._build_image_data(mask, self.current_spacing)
-            try:
-                s = grid.contour([0.5], scalars="values")
-            except Exception:
-                continue
-            if s is None or s.n_points == 0:
-                continue
-            try:
-                s = s.smooth_taubin(n_iter=12, pass_band=0.1)
-            except Exception:
-                pass
-            color = _AI_COLORS.get(cid, (0.8, 0.8, 0.8))
-            actor = self.plotter.add_mesh(
-                s, color=color, specular=0.3, smooth_shading=True)
-            name = id2name.get(str(cid), f"Bone {cid}")
-            self.separated_bones.append({
-                "uid": self._new_bone_uid(),
-                "id": cid,
-                "mesh": s,
-                "raw_mesh": s.copy(deep=True),
-                "actor": actor,
-                "visible": True,
-                "color": color,
-                "voxel_count": int(mask.sum()),
-                "name": name,
-                "series_index": self.series_combo.currentIndex(),
-            })
+        for blk in blocks:
+            label = blk["label"]                              # (nz,ny,nx)
+            sp = blk.get("spacing") or self.current_spacing   # (z,y,x)
+            oz = float(blk["zrange"][0])
+            nz, ny, nx = label.shape
+            for cid in [int(x) for x in np.unique(label) if x > 0]:
+                mask = (label == cid).astype(np.float32)
+                if mask.sum() < 50:
+                    continue
+                grid = pv.ImageData(
+                    dimensions=(nx, ny, nz),
+                    spacing=(float(sp[2]), float(sp[1]), float(sp[0])),
+                    origin=(0.0, 0.0, oz),
+                )
+                grid.point_data["values"] = mask.flatten(order="C")
+                try:
+                    s = grid.contour([0.5], scalars="values")
+                except Exception:
+                    continue
+                if s is None or s.n_points == 0:
+                    continue
+                try:
+                    s = s.smooth_taubin(n_iter=12, pass_band=0.1)
+                except Exception:
+                    pass
+                color = _AI_COLORS.get(cid, (0.8, 0.8, 0.8))
+                actor = self.plotter.add_mesh(
+                    s, color=color, specular=0.3, smooth_shading=True)
+                name = id2name.get(str(cid), f"Bone {cid}")
+                self.separated_bones.append({
+                    "uid": self._new_bone_uid(),
+                    "id": cid,
+                    "mesh": s,
+                    "raw_mesh": s.copy(deep=True),
+                    "actor": actor,
+                    "visible": True,
+                    "color": color,
+                    "voxel_count": int(mask.sum()),
+                    "name": name,
+                    "series_index": None,
+                })
 
         if not self.separated_bones:
             QMessageBox.warning(self, "AI 분할", "표시할 뼈가 없습니다.")
