@@ -94,9 +94,79 @@ def ensure_trainer():
         print(f"[infer_app] 트레이너 설치 확인 실패(계속): {e}", flush=True)
 
 
+def _avail_ram_bytes():
+    """여유 RAM(bytes). Windows는 GlobalMemoryStatusEx, 그 외는 보수적 기본값."""
+    try:
+        import ctypes
+        class M(ctypes.Structure):
+            _fields_ = [("l", ctypes.c_ulong), ("load", ctypes.c_ulong),
+                        ("tot", ctypes.c_ulonglong), ("avail", ctypes.c_ulonglong),
+                        ("a", ctypes.c_ulonglong), ("b", ctypes.c_ulonglong),
+                        ("c", ctypes.c_ulonglong), ("d", ctypes.c_ulonglong),
+                        ("e", ctypes.c_ulonglong)]
+        s = M(); s.l = ctypes.sizeof(s)
+        ctypes.windll.kernel32.GlobalMemoryStatusEx(ctypes.byref(s))
+        return int(s.avail)
+    except Exception:
+        return 8 * 10**9
+
+
+def _max_block_voxels(in_dir):
+    import glob
+    mx = 0
+    for f in glob.glob(os.path.join(in_dir, "*_0000.nii.gz")):
+        mx = max(mx, int(np.prod(nib.load(f).shape)))
+    return mx
+
+
+def _predict_lowmem(predictor, in_dir, out_dir, dev):
+    """저메모리 예측: GPU에서 argmax → 라벨(1채널)만 리샘플(원본해상도).
+
+    nnU-Net 기본 export는 22채널 logit을 원본해상도 float64로 리샘플해 RAM을 크게
+    먹는다(무릎블록 16.6GB). 여기선 logit을 GPU에서 argmax한 뒤 라벨만 리샘플하므로
+    수십분의 1 메모리로 동일 결과(경계 스무딩은 앱에서 별도 수행하므로 품질 영향 미미).
+    """
+    import glob
+    import torch
+    from nnunetv2.preprocessing.preprocessors.default_preprocessor import DefaultPreprocessor
+    from nnunetv2.imageio.simpleitk_reader_writer import SimpleITKIO
+    try:
+        from acvl_utils.cropping_and_padding.bounding_boxes import bounding_box_to_slice
+    except Exception:
+        from nnunetv2.utilities.bounding_boxes import bounding_box_to_slice  # fallback
+
+    pm = predictor.plans_manager
+    cm = predictor.configuration_manager
+    dj = predictor.dataset_json
+    pp = DefaultPreprocessor(verbose=False)
+
+    for f in sorted(glob.glob(os.path.join(in_dir, "*_0000.nii.gz"))):
+        data, _seg, props = pp.run_case([f], None, pm, cm, dj)
+        logits = predictor.predict_sliding_window_return_logits(torch.from_numpy(data))
+        # GPU에서 argmax (메모리 절약) → 라벨
+        if not isinstance(logits, torch.Tensor):
+            logits = torch.from_numpy(logits)
+        label_iso = torch.argmax(logits, dim=0).to(torch.uint8).cpu().numpy()
+        del logits
+        try:
+            torch.cuda.empty_cache()
+        except Exception:
+            pass
+        # 라벨을 원본(크롭) 해상도로 리샘플 후 bbox로 원위치
+        tgt = props["shape_after_cropping_and_before_resampling"]
+        new_sp = [props["spacing"][i] for i in pm.transpose_forward]
+        lab_res = cm.resampling_fn_seg(label_iso[None], tgt, cm.spacing, new_sp)[0]
+        out = np.zeros(props["shape_before_cropping"], dtype=np.uint8)
+        out[bounding_box_to_slice(props["bbox_used_for_cropping"])] = lab_res
+        base = os.path.basename(f).replace("_0000.nii.gz", ".nii.gz")
+        SimpleITKIO().write_seg(out, os.path.join(out_dir, base), props)
+        print(f"[infer_app][lowmem] {base} done", flush=True)
+
+
 def run_predict(in_dir, out_dir, model_dir, folds, device):
     """번들 모델로 추론 — nnUNetPredictor Python API 직접 호출.
 
+    여유 RAM을 자동 감지해, 확률 리샘플이 안 들어가면 저메모리(라벨 리샘플) 모드로 전환.
     CLI(nnUNetv2_predict) console script에 의존하지 않아 PATH/설치 위치 문제가 없다.
     """
     ensure_trainer()
@@ -109,11 +179,10 @@ def run_predict(in_dir, out_dir, model_dir, folds, device):
     from nnunetv2.inference.predict_from_raw_data import nnUNetPredictor
 
     dev = torch.device("cuda" if (device == "cuda" and torch.cuda.is_available()) else "cpu")
-    # 모델 폴더 자동 탐색: model_dir/Dataset490_*/...__3d_fullres
     ds = next(d for d in os.listdir(model_dir) if d.startswith("Dataset490"))
     trainer_dir = next(d for d in os.listdir(os.path.join(model_dir, ds)) if d.endswith("3d_fullres"))
     model_folder = os.path.join(model_dir, ds, trainer_dir)
-    print(f"[infer_app] device={dev} folds={folds} model={model_folder}", flush=True)
+    print(f"[infer_app] device={dev} folds={folds}", flush=True)
 
     predictor = nnUNetPredictor(
         tile_step_size=0.5, use_gaussian=True, use_mirroring=False,
@@ -122,9 +191,20 @@ def run_predict(in_dir, out_dir, model_dir, folds, device):
     predictor.initialize_from_trained_model_folder(
         model_folder, use_folds=tuple(int(f) for f in folds),
         checkpoint_name="checkpoint_final.pth")
-    predictor.predict_from_files(
-        in_dir, out_dir, save_probabilities=False, overwrite=True,
-        num_processes_preprocessing=2, num_processes_segmentation_export=2)
+
+    # 자원 자동 감지: 확률 리샘플(22채널 float64) 예상 vs 여유 RAM
+    n_cls = predictor.label_manager.num_segmentation_heads
+    peak = _max_block_voxels(in_dir) * n_cls * 8 * 2   # float64 + 여유
+    avail = _avail_ram_bytes()
+    print(f"[infer_app] RAM 여유 {avail/1e9:.1f}GB, 확률리샘플 예상 {peak/1e9:.1f}GB", flush=True)
+    if avail > peak:
+        print("[infer_app] 고품질 모드(확률 리샘플)", flush=True)
+        predictor.predict_from_files_sequential(
+            in_dir, out_dir, save_probabilities=False, overwrite=True,
+            folder_with_segs_from_prev_stage=None)
+    else:
+        print("[infer_app] 저메모리 모드(GPU argmax + 라벨 리샘플)", flush=True)
+        _predict_lowmem(predictor, in_dir, out_dir, dev)
 
 
 def postprocess_block(lab, ct, citer=3, leg_dil=6):
@@ -182,23 +262,33 @@ def run(dicom_dir, out_npz, folds, device, model_dir):
         run_predict(in_dir, pred_dir, model_dir, folds, device)
 
         # 후처리 + 앱용 npz 패키징
+        # 라벨·CT를 둘 다 SimpleITK로 읽어 동일한 (z,y,x) 축 순서로 정합.
+        # (앱 image_hu도 (nz,ny,nx) 순서라 그대로 저장하면 됨)
+        import SimpleITK as sitk
         out = {"n_blocks": n, "id2name": json.dumps(ID2NAME, ensure_ascii=False)}
         for i in range(n):
-            pnii = nib.load(os.path.join(pred_dir, f"st{i:02d}.nii.gz"))
-            lab_xyz = np.asanyarray(pnii.dataobj)                 # (x,y,z)
-            ct_xyz = np.asanyarray(cts[i].dataobj)                # (x,y,z)
-            lab_clean = postprocess_block(lab_xyz, ct_xyz)
-            # 앱 image_hu는 (nz,ny,nx). NIfTI (x,y,z) → transpose (z,y,x).
-            lab_zyx = np.transpose(lab_clean, (2, 1, 0)).astype(np.uint8)
-            aff = pnii.affine
-            # 스테이션 world z-범위 (origin z ~ aff[2,3], z-spacing ~ aff[2,2])
-            nzz = lab_xyz.shape[2]
+            lab_zyx = sitk.GetArrayFromImage(
+                sitk.ReadImage(os.path.join(pred_dir, f"st{i:02d}.nii.gz")))    # (z,y,x)
+            ct_zyx = sitk.GetArrayFromImage(
+                sitk.ReadImage(os.path.join(in_dir, f"st{i:02d}_0000.nii.gz")))  # (z,y,x)
+            # nnU-Net writer가 입력과 다른 축 순서로 저장할 수 있어 CT 기준으로 정합.
+            # (축상 512x512, z축 크기 고유 → 크기 매칭으로 안전. x/y 순서는 보존)
+            if lab_zyx.shape != ct_zyx.shape:
+                perm, used = [], set()
+                for tsz in ct_zyx.shape:
+                    for ax in range(lab_zyx.ndim):
+                        if ax not in used and lab_zyx.shape[ax] == tsz:
+                            perm.append(ax); used.add(ax); break
+                if len(perm) == lab_zyx.ndim:
+                    lab_zyx = np.transpose(lab_zyx, perm)
+            lab_clean = postprocess_block(lab_zyx.astype(np.uint8), ct_zyx).astype(np.uint8)
+            aff = cts[i].affine
+            nzz = lab_clean.shape[0]   # z 축이 0
             z0 = float(aff[2, 3]); z1 = float(aff[2, 3] + aff[2, 2] * (nzz - 1))
-            # spacing (x,y,z) = 각 affine 열의 norm → 앱 (z,y,x) 순서로 저장
-            sp_xyz = np.sqrt((aff[:3, :3] ** 2).sum(axis=0))
-            out[f"block{i}_label"] = lab_zyx
+            sp_xyz = np.sqrt((aff[:3, :3] ** 2).sum(axis=0))   # (x,y,z)
+            out[f"block{i}_label"] = lab_clean                 # 이미 (z,y,x) = 앱 순서
             out[f"block{i}_zrange"] = np.array([min(z0, z1), max(z0, z1)], dtype=np.float64)
-            out[f"block{i}_shape"] = np.array(lab_zyx.shape, dtype=np.int64)
+            out[f"block{i}_shape"] = np.array(lab_clean.shape, dtype=np.int64)
             out[f"block{i}_spacing"] = np.array(
                 [sp_xyz[2], sp_xyz[1], sp_xyz[0]], dtype=np.float64)  # (z,y,x)
         np.savez_compressed(out_npz, **out)
