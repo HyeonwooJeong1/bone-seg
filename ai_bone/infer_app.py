@@ -38,6 +38,27 @@ LR_PAIRS = [(1, 2), (3, 4), (6, 7), (8, 9), (10, 11),
 METAL_THR = 1900
 
 
+def _ascii_temp_dir():
+    """한글 사용자명(예: C:\\Users\\정현우\\...) 회피용 ASCII 임시 베이스.
+
+    nnU-Net(SimpleITK)이 non-ASCII 경로의 이미지를 못 열어 워커가 죽으므로,
+    임시 작업폴더를 완전 ASCII 경로(C:\\Temp 등)에 만든다. 8.3 단축은 사용자
+    프로필 폴더엔 적용 안 돼(정현우 유지) 소용없음이 확인됨.
+    """
+    if os.name != "nt":
+        return None
+    for base in (r"C:\Temp", r"C:\ai_tmp", r"C:\Windows\Temp"):
+        if all(ord(c) < 128 for c in base):
+            try:
+                os.makedirs(base, exist_ok=True)
+                t = tempfile.mkdtemp(prefix="probe_", dir=base)  # 쓰기 가능 확인
+                os.rmdir(t)
+                return base
+            except Exception:
+                continue
+    return None
+
+
 def pick_device(arg):
     if arg and arg != "auto":
         return arg
@@ -74,31 +95,36 @@ def ensure_trainer():
 
 
 def run_predict(in_dir, out_dir, model_dir, folds, device):
-    """번들 모델로 nnUNetv2_predict 실행 (subprocess)."""
-    import subprocess
+    """번들 모델로 추론 — nnUNetPredictor Python API 직접 호출.
+
+    CLI(nnUNetv2_predict) console script에 의존하지 않아 PATH/설치 위치 문제가 없다.
+    """
     ensure_trainer()
-    env = dict(os.environ)
-    env["nnUNet_results"] = model_dir
-    # predict엔 raw/preprocessed 불필요하지만 미설정 시 에러 → 존재 경로로 채움
-    env.setdefault("nnUNet_raw", model_dir)
-    env.setdefault("nnUNet_preprocessed", model_dir)
-    env["nnUNet_compile"] = "f"
-    # nnUNetv2_predict 실행파일을 현재 파이썬 환경에서 직접 탐색(PATH 미설정 대비)
-    exe_dir = os.path.dirname(sys.executable)
-    cands = [
-        os.path.join(exe_dir, "nnUNetv2_predict.exe"),
-        os.path.join(exe_dir, "nnUNetv2_predict"),
-        os.path.join(exe_dir, "Scripts", "nnUNetv2_predict.exe"),
-        os.path.join(exe_dir, "bin", "nnUNetv2_predict"),
-        "nnUNetv2_predict",
-    ]
-    predict_exe = next((c for c in cands if os.path.exists(c)), "nnUNetv2_predict")
-    cmd = [predict_exe, "-i", in_dir, "-o", out_dir,
-           "-d", "490", "-c", "3d_fullres",
-           "-p", "nnUNetPlans_iso06", "-tr", "nnUNetTrainerNoMirroring_ES",
-           "-f", *[str(f) for f in folds], "-device", device]
-    print(f"[infer_app] device={device} folds={folds}", flush=True)
-    subprocess.run(cmd, env=env, check=True)
+    os.environ["nnUNet_results"] = model_dir
+    os.environ.setdefault("nnUNet_raw", model_dir)
+    os.environ.setdefault("nnUNet_preprocessed", model_dir)
+    os.environ["nnUNet_compile"] = "f"
+
+    import torch
+    from nnunetv2.inference.predict_from_raw_data import nnUNetPredictor
+
+    dev = torch.device("cuda" if (device == "cuda" and torch.cuda.is_available()) else "cpu")
+    # 모델 폴더 자동 탐색: model_dir/Dataset490_*/...__3d_fullres
+    ds = next(d for d in os.listdir(model_dir) if d.startswith("Dataset490"))
+    trainer_dir = next(d for d in os.listdir(os.path.join(model_dir, ds)) if d.endswith("3d_fullres"))
+    model_folder = os.path.join(model_dir, ds, trainer_dir)
+    print(f"[infer_app] device={dev} folds={folds} model={model_folder}", flush=True)
+
+    predictor = nnUNetPredictor(
+        tile_step_size=0.5, use_gaussian=True, use_mirroring=False,
+        perform_everything_on_device=(dev.type == "cuda"),
+        device=dev, verbose=False, verbose_preprocessing=False, allow_tqdm=True)
+    predictor.initialize_from_trained_model_folder(
+        model_folder, use_folds=tuple(int(f) for f in folds),
+        checkpoint_name="checkpoint_final.pth")
+    predictor.predict_from_files(
+        in_dir, out_dir, save_probabilities=False, overwrite=True,
+        num_processes_preprocessing=2, num_processes_segmentation_export=2)
 
 
 def postprocess_block(lab, ct, citer=3, leg_dil=6):
@@ -136,7 +162,11 @@ def run(dicom_dir, out_npz, folds, device, model_dir):
     if not os.path.isdir(model_dir):
         raise FileNotFoundError(f"모델 폴더 없음: {model_dir}")
 
-    work = tempfile.mkdtemp(prefix="aiseg_")
+    ascii_base = _ascii_temp_dir()     # 한글경로 회피 (SimpleITK)
+    if ascii_base:
+        os.environ["TMP"] = ascii_base
+        os.environ["TEMP"] = ascii_base
+    work = tempfile.mkdtemp(prefix="aiseg_", dir=ascii_base)
     in_dir = os.path.join(work, "in"); os.makedirs(in_dir, exist_ok=True)
     pred_dir = os.path.join(work, "pred"); os.makedirs(pred_dir, exist_ok=True)
     try:
