@@ -7,6 +7,22 @@ from PyQt5.QtWidgets import QFileDialog, QMessageBox
 
 from app.constants import BASE_DATA_DIR, SESSION_FORMAT, SESSION_VERSION
 
+# Canonical names of AI-segmented bones. Only these (or bones tagged
+# source=='ai') are saved/restored; legacy HU/threshold bones are dropped.
+_AI_BONE_NAMES = {
+    "Femur_L", "Femur_R", "Hip_L", "Hip_R", "Sacrum", "Patella_L",
+    "Patella_R", "Tibia_L", "Tibia_R", "Fibula_L", "Fibula_R",
+    "Talus_L", "Talus_R", "Calcaneus_L", "Calcaneus_R", "Tarsals_L",
+    "Tarsals_R", "Metatarsals_L", "Metatarsals_R", "Phalanges_L", "Phalanges_R",
+}
+
+
+def _is_ai_bone(bone):
+    """True if a bone dict / saved state belongs to the AI segmentation."""
+    return (bone.get('source') == 'ai'
+            or bone.get('name', '') in _AI_BONE_NAMES)
+
+
 class SessionIoMixin:
     def on_save_session_clicked(self):
         if not self.all_series_data:
@@ -185,6 +201,9 @@ class SessionIoMixin:
                 and self.separated_bones and mesh_dir is not None):
             bones_state = []
             for i, bone in enumerate(self.separated_bones):
+                # Only persist AI-segmented bones; skip legacy HU/ivory bones.
+                if not _is_ai_bone(bone):
+                    continue
                 mesh_file = self._save_mesh_to_dir(
                     bone.get('mesh'), mesh_dir, f"bone_{i:03d}.vtk")
                 raw_file = self._save_mesh_to_dir(
@@ -570,16 +589,8 @@ class SessionIoMixin:
                                    self.merge_fill_iterations)
 
         # 뼈 복원 — AI로 분리한 뼈만 불러온다 (옛 HU/threshold 분리 뼈는 제외).
-        _AI_NAMES = {
-            "Femur_L", "Femur_R", "Hip_L", "Hip_R", "Sacrum", "Patella_L",
-            "Patella_R", "Tibia_L", "Tibia_R", "Fibula_L", "Fibula_R",
-            "Talus_L", "Talus_R", "Calcaneus_L", "Calcaneus_R", "Tarsals_L",
-            "Tarsals_R", "Metatarsals_L", "Metatarsals_R", "Phalanges_L", "Phalanges_R",
-        }
         for bone_state in sep.get('bones', []):
-            is_ai = (bone_state.get('source') == 'ai'
-                     or bone_state.get('name', '') in _AI_NAMES)
-            if not is_ai:
+            if not _is_ai_bone(bone_state):
                 continue
             mesh = self._load_mesh_from_dir(mesh_dir,
                                             bone_state.get('mesh_file'))

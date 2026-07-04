@@ -333,6 +333,9 @@ class MainWindow(
         # ============================================================
         # 1) Patient Selection (always visible at top)
         # ============================================================
+        version_label = QLabel(f"3D CT Bone Visualizer  ·  v{APP_VERSION}")
+        version_label.setStyleSheet("color: #888; font-size: 10px;")
+        self.control_layout.addWidget(version_label)
         self.control_layout.addWidget(QLabel("<b>Patient</b>"))
         self.patient_combo = QComboBox()
         self.control_layout.addWidget(self.patient_combo)
