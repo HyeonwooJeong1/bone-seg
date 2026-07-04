@@ -178,7 +178,10 @@ def run_predict(in_dir, out_dir, model_dir, folds, device):
     import torch
     from nnunetv2.inference.predict_from_raw_data import nnUNetPredictor
 
-    dev = torch.device("cuda" if (device == "cuda" and torch.cuda.is_available()) else "cpu")
+    # GPU 자동 감지(앱에서 넘어온 device가 잘못돼도 여기서 확실히 판단).
+    # 별도 프로세스라 CUDA 감지가 신뢰 가능. GPU 있으면 무조건 GPU 사용.
+    dev = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    print(f"[infer_app] 실제 추론 device: {dev} (CUDA available={torch.cuda.is_available()})", flush=True)
     ds = next(d for d in os.listdir(model_dir) if d.startswith("Dataset490"))
     trainer_dir = next(d for d in os.listdir(os.path.join(model_dir, ds)) if d.endswith("3d_fullres"))
     model_folder = os.path.join(model_dir, ds, trainer_dir)
