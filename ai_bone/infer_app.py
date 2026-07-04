@@ -128,6 +128,7 @@ def _predict_lowmem(predictor, in_dir, out_dir, dev):
     """
     import glob
     import torch
+    import torch.nn.functional as F
     from nnunetv2.preprocessing.preprocessors.default_preprocessor import DefaultPreprocessor
     from nnunetv2.imageio.simpleitk_reader_writer import SimpleITKIO
     try:
@@ -143,19 +144,19 @@ def _predict_lowmem(predictor, in_dir, out_dir, dev):
     for f in sorted(glob.glob(os.path.join(in_dir, "*_0000.nii.gz"))):
         data, _seg, props = pp.run_case([f], None, pm, cm, dj)
         logits = predictor.predict_sliding_window_return_logits(torch.from_numpy(data))
-        # GPU에서 argmax (메모리 절약) → 라벨
         if not isinstance(logits, torch.Tensor):
             logits = torch.from_numpy(logits)
-        label_iso = torch.argmax(logits, dim=0).to(torch.uint8).cpu().numpy()
+        # argmax + 원본해상도 리샘플을 모두 GPU에서 (nearest) → CPU 병목 제거
+        label_iso = torch.argmax(logits, dim=0).to(dev)
         del logits
+        tgt = tuple(int(x) for x in props["shape_after_cropping_and_before_resampling"])
+        lab_res = F.interpolate(label_iso[None, None].float(), size=tgt, mode="nearest")[0, 0]
+        lab_res = lab_res.to(torch.uint8).cpu().numpy()
+        del label_iso
         try:
             torch.cuda.empty_cache()
         except Exception:
             pass
-        # 라벨을 원본(크롭) 해상도로 리샘플 후 bbox로 원위치
-        tgt = props["shape_after_cropping_and_before_resampling"]
-        new_sp = [props["spacing"][i] for i in pm.transpose_forward]
-        lab_res = cm.resampling_fn_seg(label_iso[None], tgt, cm.spacing, new_sp)[0]
         out = np.zeros(props["shape_before_cropping"], dtype=np.uint8)
         out[bounding_box_to_slice(props["bbox_used_for_cropping"])] = lab_res
         base = os.path.basename(f).replace("_0000.nii.gz", ".nii.gz")
@@ -178,10 +179,13 @@ def run_predict(in_dir, out_dir, model_dir, folds, device):
     import torch
     from nnunetv2.inference.predict_from_raw_data import nnUNetPredictor
 
-    # GPU 자동 감지(앱에서 넘어온 device가 잘못돼도 여기서 확실히 판단).
-    # 별도 프로세스라 CUDA 감지가 신뢰 가능. GPU 있으면 무조건 GPU 사용.
-    dev = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    print(f"[infer_app] 실제 추론 device: {dev} (CUDA available={torch.cuda.is_available()})", flush=True)
+    # GPU 필수: CPU는 3D 고해상 추론에 너무 느려(시간 단위) 아예 실행하지 않음.
+    if not torch.cuda.is_available():
+        raise RuntimeError(
+            "GPU(CUDA)가 없어 AI 분할을 실행하지 않습니다.\n"
+            "GPU가 있는 PC에서 실행하거나, 이미 분할된 환자(캐시)를 사용하세요.")
+    dev = torch.device("cuda")
+    print(f"[infer_app] 추론 device: {dev} ({torch.cuda.get_device_name(0)})", flush=True)
     ds = next(d for d in os.listdir(model_dir) if d.startswith("Dataset490"))
     trainer_dir = next(d for d in os.listdir(os.path.join(model_dir, ds)) if d.endswith("3d_fullres"))
     model_folder = os.path.join(model_dir, ds, trainer_dir)
