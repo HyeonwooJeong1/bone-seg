@@ -39,6 +39,7 @@ from app.mixins import (
     CroppingMixin,
     ParticleRemovalMixin,
     SliceViewerMixin,
+    AiSegmentationMixin,
 )
 from app.ui.collapsible import CollapsibleSection
 
@@ -54,6 +55,7 @@ class MainWindow(
     CroppingMixin,
     ParticleRemovalMixin,
     SliceViewerMixin,
+    AiSegmentationMixin,
     QMainWindow,
 ):
     def __init__(self, parent=None):
@@ -186,6 +188,8 @@ class MainWindow(
         self.min_bone_voxels = 500               # min mesh cell count per bone
         # Each entry: uid, id, mesh, actor, visible, color, voxel_count, name, series_index
         self.separated_bones = []
+        # AI 뼈 분할(학습 모델) 활성 여부
+        self.ai_segmentation_active = False
         # Phase 2: apply mesh-level Stage A to each bone when separating
         self.separation_apply_stage_a = False
         # Snapshot of the original single-mesh actor's visibility so we can
@@ -574,6 +578,22 @@ class MainWindow(
             "QLabel { color: #666; padding: 2px; }"
         )
         self.separation_section.addWidget(self.separation_status_label)
+
+        # ── AI 뼈 분할 (번들 nnU-Net 통합모델) ──
+        self.separation_section.addWidget(QLabel("<b>AI 뼈 분할 (학습 모델)</b>"))
+        ai_btn_row = QHBoxLayout()
+        self.ai_seg_btn = QPushButton("AI 뼈 분할 실행")
+        self.ai_seg_btn.setToolTip(
+            "번들된 nnU-Net 통합모델로 현재 환자 CT를 뼈별로 분할합니다.\n"
+            "GPU가 있으면 GPU, 없으면 CPU로 실행 (처음 1회는 수 분 소요, 이후 캐시)."
+        )
+        self.ai_seg_btn.clicked.connect(self.apply_ai_segmentation)
+        ai_btn_row.addWidget(self.ai_seg_btn)
+        self.ai_clear_btn = QPushButton("AI 끄기")
+        self.ai_clear_btn.setToolTip("AI 뼈를 지우고 threshold 렌더로 복원합니다.")
+        self.ai_clear_btn.clicked.connect(self.clear_ai_segmentation)
+        ai_btn_row.addWidget(self.ai_clear_btn)
+        self.separation_section.addLayout(ai_btn_row)
 
         # Phase 2: per-bone list (multi-select for merge, no checkbox interference)
         self.bone_list_widget = QListWidget()

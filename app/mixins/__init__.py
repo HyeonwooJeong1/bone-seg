@@ -8,6 +8,7 @@ from app.mixins.session_io import SessionIoMixin
 from app.mixins.patient_load import PatientLoadMixin
 from app.mixins.export_scout import ExportScoutMixin
 from app.mixins.slice_viewer import SliceViewerMixin
+from app.mixins.ai_segmentation import AiSegmentationMixin
 
 __all__ = [
     'MeshPipelineMixin',
@@ -20,4 +21,5 @@ __all__ = [
     'CroppingMixin',
     'ParticleRemovalMixin',
     'SliceViewerMixin',
+    'AiSegmentationMixin',
 ]
