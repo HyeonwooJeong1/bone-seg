@@ -204,10 +204,13 @@ class SessionIoMixin:
                 # Only persist AI-segmented bones; skip legacy HU/ivory bones.
                 if not _is_ai_bone(bone):
                     continue
+                # Persist the pristine full surface (raw_mesh) — the crop is a
+                # view-only clip that must not be baked into the saved mesh.
+                full_mesh = bone.get('raw_mesh') or bone.get('mesh')
                 mesh_file = self._save_mesh_to_dir(
-                    bone.get('mesh'), mesh_dir, f"bone_{i:03d}.vtk")
+                    full_mesh, mesh_dir, f"bone_{i:03d}.vtk")
                 raw_file = self._save_mesh_to_dir(
-                    bone.get('raw_mesh'), mesh_dir, f"bone_{i:03d}_raw.vtk")
+                    full_mesh, mesh_dir, f"bone_{i:03d}_raw.vtk")
                 bones_state.append({
                     'uid': bone.get('uid', ''),
                     'id': bone.get('id', 0),

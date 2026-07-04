@@ -12,6 +12,18 @@ class CroppingMixin:
         - Single mode: the active volume grid's bounds.
         Returns None when nothing is rendered yet.
         """
+        # AI-first mode: fit the box to the union of the AI bones' full surfaces
+        # (they're already in the base-grid frame the crop widget lives in).
+        if getattr(self, 'ai_segmentation_active', False) and getattr(self, 'separated_bones', None):
+            bl = []
+            for bone in self.separated_bones:
+                m = bone.get('raw_mesh') or bone.get('mesh')
+                if m is not None and m.n_points > 0:
+                    bl.append(m.bounds)
+            if bl:
+                return (min(b[0] for b in bl), max(b[1] for b in bl),
+                        min(b[2] for b in bl), max(b[3] for b in bl),
+                        min(b[4] for b in bl), max(b[5] for b in bl))
         if self.fusion_enabled:
             bounds_list = []
             # fusion_meshes stores (series_index, mesh) tuples — unpack carefully
@@ -40,8 +52,66 @@ class CroppingMixin:
         return None
 
 
+    def _apply_crop_to_ai_bones(self):
+        """Clip every AI-segmented bone against the crop box (view-only).
+
+        Each bone keeps its pristine full surface in `raw_mesh`; the visible
+        actor and the `mesh` used for the selection highlight are derived from
+        it live, mirroring how the volume/fusion crop re-clips on every change.
+        Returns True if AI bones were handled (so the caller can skip the
+        volume/fusion renderer)."""
+        bones = getattr(self, 'separated_bones', None)
+        if not bones:
+            return False
+        crop_active = (
+            getattr(self, 'cropping_bounds', None) is not None
+            and getattr(self, 'crop_checkbox', None) is not None
+            and self.crop_checkbox.isChecked()
+        )
+        for bone in bones:
+            full = bone.get('raw_mesh') or bone.get('mesh')
+            if full is None:
+                continue
+            disp, empty = full, False
+            if crop_active:
+                try:
+                    clipped = full.clip_box(self.cropping_bounds, invert=False)
+                    if clipped is not None and clipped.n_points > 0:
+                        disp = clipped
+                    else:
+                        empty = True  # bone lies entirely outside the box
+                except Exception:
+                    disp = full
+            # `mesh` tracks what's on screen (highlight wireframe uses it).
+            bone['mesh'] = full if empty else disp
+            actor = bone.get('actor')
+            if actor is None:
+                continue
+            try:
+                if not empty:
+                    actor.mapper.dataset = disp
+                actor.SetVisibility(bool(bone.get('visible', True)) and not empty)
+            except Exception:
+                pass
+        # Re-draw the yellow selection wireframe against the clipped meshes.
+        if (hasattr(self, '_on_bone_list_selection_changed')
+                and hasattr(self, 'bone_list_widget')
+                and self.bone_list_widget.selectedItems()):
+            try:
+                self._on_bone_list_selection_changed()
+            except Exception:
+                pass
+        try:
+            self.plotter.render()
+        except Exception:
+            pass
+        return True
+
     def _rerender_for_crop(self):
         """Re-run whichever renderer owns the scene so crop changes show up."""
+        # AI-first mode: the visible geometry is the AI bones, not the volume.
+        if getattr(self, 'ai_segmentation_active', False) and self._apply_crop_to_ai_bones():
+            return
         if self.fusion_enabled:
             self._update_fused_meshes()
         else:
