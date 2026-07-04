@@ -218,6 +218,7 @@ class LandmarksMixin:
                 'grid': grid_pt,
                 'lps': lps_pt,
                 'ras': ras_pt,
+                'memo': '',
             }
             self.landmark_data.append(entry)
 
@@ -571,6 +572,8 @@ class LandmarksMixin:
         # Highlight the selected landmark spheres (yellow) so you can see which
         # point is selected; unselected ones go back to red.
         self._update_landmark_selection_color(rows)
+        if hasattr(self, "_update_info_panel"):
+            self._update_info_panel()
 
         self._clear_measurement_visualization()
 

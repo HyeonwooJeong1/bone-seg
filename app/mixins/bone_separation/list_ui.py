@@ -151,8 +151,7 @@ class BoneListUIMixin:
             import vtk
             self._bone_cell_picker = vtk.vtkCellPicker()
             self._bone_cell_picker.SetTolerance(0.005)
-        except Exception as e:
-            print(f"[BoneClick] vtkCellPicker init failed: {e}")
+        except Exception:
             return
 
         self._bone_click_press_pos = None  # mouse‑down screen pos
@@ -166,8 +165,7 @@ class BoneListUIMixin:
                 native = self.plotter.iren.interactor
                 self._bone_click_press_obs = native.AddObserver(
                     'LeftButtonPressEvent', self._on_3d_bone_press)
-            except Exception as e:
-                print(f"[BoneClick] press observer failed: {e}")
+            except Exception:
                 self._bone_click_press_obs = None
 
         # ── release observer (실제 선택 로직) ──
@@ -179,12 +177,8 @@ class BoneListUIMixin:
                 native = self.plotter.iren.interactor
                 self._bone_click_release_obs = native.AddObserver(
                     'LeftButtonReleaseEvent', self._on_3d_bone_release)
-            except Exception as e:
-                print(f"[BoneClick] release observer failed: {e}")
+            except Exception:
                 self._bone_click_release_obs = None
-
-        print(f"[BoneClick] Enabled  press={self._bone_click_press_obs}  "
-              f"release={self._bone_click_release_obs}")
 
     def _disable_bone_click_selection(self):
         """3D 뷰 클릭 선택 비활성화."""
@@ -301,7 +295,6 @@ class BoneListUIMixin:
         # MultiSelection 모드에서 selectionModel.select(ClearAndSelect)는
         # 다른 항목을 해제 안 할 수 있음 → clearSelection() + setSelected() 사용
         target_uid = target_bone.get('uid')
-        print(f"[BoneClick] hit={target_bone.get('name')}  ctrl={ctrl_held}")
 
         # block signals: 일괄 변경 후 시그널 1번만 발생시키기
         self.bone_list_widget.blockSignals(True)
@@ -383,6 +376,11 @@ class BoneListUIMixin:
             self.plotter.render()
         finally:
             self._in_highlight_update = False
+            if hasattr(self, "_update_info_panel"):
+                try:
+                    self._update_info_panel()
+                except Exception:
+                    pass
 
     def _on_bone_list_item_double_clicked(self, item):
         self._rename_bone_item(item)

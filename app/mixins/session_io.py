@@ -115,6 +115,7 @@ class SessionIoMixin:
             item = {
                 'name': e['name'],
                 'grid': [float(v) for v in e['grid']],
+                'memo': str(e.get('memo', '')),
             }
             if e.get('lps') is not None:
                 item['lps'] = [float(v) for v in e['lps']]
@@ -461,6 +462,7 @@ class SessionIoMixin:
                     'lps': (np.asarray(lm['lps'], dtype=float)
                             if lm.get('lps') is not None else self._grid_to_lps(grid)),
                     'ras': None,
+                    'memo': str(lm.get('memo', '')),
                 }
                 if lm.get('ras') is not None:
                     entry['ras'] = np.asarray(lm['ras'], dtype=float)

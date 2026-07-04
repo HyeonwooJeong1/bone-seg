@@ -364,6 +364,25 @@ class MainWindow(
         self.control_layout.addLayout(session_row)
 
         # ============================================================
+        # 1b) Selection Info + Memo (current state at a glance)
+        # ============================================================
+        self.info_section = CollapsibleSection("Selection Info", expanded=True)
+        self.info_label = QLabel("<i>Nothing selected.</i>")
+        self.info_label.setWordWrap(True)
+        self.info_label.setStyleSheet("QLabel { padding: 4px; }")
+        self.info_section.addWidget(self.info_label)
+        self.info_section.addWidget(QLabel("Memo (for the selected point):"))
+        from PyQt5.QtWidgets import QPlainTextEdit
+        self.memo_edit = QPlainTextEdit()
+        self.memo_edit.setPlaceholderText("Select a single landmark to add a note…")
+        self.memo_edit.setFixedHeight(60)
+        self.memo_edit.setEnabled(False)
+        self._memo_row = None
+        self.memo_edit.textChanged.connect(self._on_memo_changed)
+        self.info_section.addWidget(self.memo_edit)
+        self.control_layout.addWidget(self.info_section)
+
+        # ============================================================
         # 2) Series & Display (always visible)
         # ============================================================
         self.control_layout.addSpacing(8)

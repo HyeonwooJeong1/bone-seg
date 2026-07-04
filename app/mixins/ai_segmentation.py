@@ -308,6 +308,7 @@ class AiSegmentationMixin:
         # Enable click-to-select in the 3D view (click a bone -> selected in list)
         if hasattr(self, "_enable_bone_click_selection"):
             self._enable_bone_click_selection()
+        self._update_info_panel()
         try:
             if not getattr(self, "_camera_initialized", False):
                 self.plotter.reset_camera()
@@ -343,7 +344,86 @@ class AiSegmentationMixin:
             self.separation_status_label.setText("")
         if hasattr(self, "_refresh_separation_list"):
             self._refresh_separation_list()
+        self._update_info_panel()
         try:
             self.plotter.update()
         except Exception:
             pass
+
+    # ── Selection Info panel + landmark memo ────────────────────
+    def _update_info_panel(self):
+        """Refresh the Selection Info panel from the current selection.
+
+        Landmark selection takes priority; otherwise show bone selection;
+        otherwise a short summary of the current state.
+        """
+        if not hasattr(self, "info_label"):
+            return
+        # Landmark rows selected?
+        lm_rows = []
+        if hasattr(self, "landmark_table") and self.landmark_table is not None:
+            sm = self.landmark_table.selectionModel()
+            if sm is not None:
+                lm_rows = sorted({i.row() for i in sm.selectedRows()
+                                  if 0 <= i.row() < len(self.landmark_data)})
+        if lm_rows:
+            self._info_show_landmarks(lm_rows)
+            return
+        bone_items = (self.bone_list_widget.selectedItems()
+                      if hasattr(self, "bone_list_widget") else [])
+        if bone_items:
+            self._info_show_bones(bone_items)
+            return
+        self._info_show_summary()
+
+    def _info_disable_memo(self):
+        self._memo_row = None
+        if hasattr(self, "memo_edit"):
+            self.memo_edit.blockSignals(True)
+            self.memo_edit.setPlainText("")
+            self.memo_edit.blockSignals(False)
+            self.memo_edit.setEnabled(False)
+
+    def _info_show_landmarks(self, rows):
+        parts = []
+        for r in rows:
+            e = self.landmark_data[r]
+            g = e.get("grid")
+            gtxt = ", ".join(f"{float(v):.1f}" for v in g) if g is not None else "-"
+            parts.append(f"<b>{e.get('name','')}</b> &nbsp; grid=({gtxt})")
+        self.info_label.setText("Landmark(s) selected:<br>" + "<br>".join(parts))
+        if len(rows) == 1 and hasattr(self, "memo_edit"):
+            self._memo_row = rows[0]
+            self.memo_edit.blockSignals(True)
+            self.memo_edit.setPlainText(str(self.landmark_data[rows[0]].get("memo", "")))
+            self.memo_edit.blockSignals(False)
+            self.memo_edit.setEnabled(True)
+        else:
+            self._info_disable_memo()
+
+    def _info_show_bones(self, items):
+        self._info_disable_memo()
+        parts = []
+        for it in items:
+            b = self._bone_by_uid(it.data(Qt.UserRole))
+            if b is None:
+                continue
+            vis = "shown" if b.get("visible", True) else "hidden"
+            parts.append(f"<b>{b.get('name','')}</b> &nbsp; "
+                         f"{b.get('voxel_count', 0):,} vox &nbsp; ({vis})")
+        self.info_label.setText("Bone(s) selected:<br>" + "<br>".join(parts))
+
+    def _info_show_summary(self):
+        self._info_disable_memo()
+        nb = len(getattr(self, "separated_bones", []))
+        nl = len(getattr(self, "landmark_data", []))
+        mode = "AI segmentation" if getattr(self, "ai_segmentation_active", False) else "Threshold"
+        self.info_label.setText(
+            f"<i>Nothing selected.</i><br>Mode: <b>{mode}</b><br>"
+            f"Bones: {nb} &nbsp;·&nbsp; Landmarks: {nl}")
+
+    def _on_memo_changed(self):
+        if getattr(self, "_memo_row", None) is None:
+            return
+        if 0 <= self._memo_row < len(self.landmark_data):
+            self.landmark_data[self._memo_row]["memo"] = self.memo_edit.toPlainText()
