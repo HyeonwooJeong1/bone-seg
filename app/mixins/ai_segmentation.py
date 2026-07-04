@@ -220,6 +220,27 @@ class AiSegmentationMixin:
                 return best
         return None
 
+    def _ai_base_transform(self, series_idx):
+        """4x4 transform: series-idx grid(mm) → base series grid(mm), or None.
+
+        Uses the same LPS basis the slice indicator / landmarks / fused volume
+        use, so AI bones land in the app's coordinate frame. None if geometry
+        is missing (caller then falls back to physical-z placement).
+        """
+        if series_idx is None:
+            return None
+        try:
+            base_idx = int(getattr(self, "base_series_index", 0))
+            base_meta = self.all_series_data[base_idx].get("meta", {}) or {}
+            i_meta = self.all_series_data[series_idx].get("meta", {}) or {}
+            T_base = self._series_grid_to_lps_matrix(base_meta)
+            T_i = self._series_grid_to_lps_matrix(i_meta)
+            if T_base is None or T_i is None:
+                return None
+            return np.linalg.inv(T_base) @ T_i
+        except Exception:
+            return None
+
     # ── ③ 라벨 → 뼈별 의미론적 메시 표시 ─────────────────────────
     def apply_ai_segmentation(self, auto=False):
         """현재 시리즈에 AI 라벨을 적용 — 뼈마다 색·이름 메시로 표시.
@@ -245,13 +266,25 @@ class AiSegmentationMixin:
         self.separated_bones = []
         self._hide_volume_for_ai()
 
-        # 모든 스테이션(블록)을 물리 z 위치에 배치 → 전체 하지 한 번에 표시.
-        # (블록마다 z-spacing이 다르므로 저장된 spacing 사용, 없으면 현재 시리즈 것)
+        # 각 블록을 로드된 시리즈(같은 z-gap 분할)에 매칭 → 그 시리즈 grid에서
+        # 메쉬 생성 후 앱 기준 프레임(base grid, LPS 변환)으로 옮김 → 2D 슬라이스
+        # 뷰어·랜드마크·볼륨과 좌표 정합. 매칭/지오메트리 실패 시 물리z 폴백.
         import pyvista as pv
         for blk in blocks:
             label = blk["label"]                              # (nz,ny,nx)
-            sp = blk.get("spacing") or self.current_spacing   # (z,y,x)
-            oz = float(blk["zrange"][0])
+            series_idx = None
+            for si, sd in enumerate(getattr(self, "all_series_data", []) or []):
+                ih = sd.get("image_hu")
+                if ih is not None and tuple(ih.shape) == tuple(label.shape):
+                    series_idx = si
+                    break
+            T = self._ai_base_transform(series_idx) if series_idx is not None else None
+            if T is not None:
+                sp = self.all_series_data[series_idx]["spacing"]   # (z,y,x)
+                origin = (0.0, 0.0, 0.0)
+            else:
+                sp = blk.get("spacing") or self.current_spacing
+                origin = (0.0, 0.0, float(blk["zrange"][0]))
             nz, ny, nx = label.shape
             for cid in [int(x) for x in np.unique(label) if x > 0]:
                 mask = (label == cid).astype(np.float32)
@@ -260,7 +293,7 @@ class AiSegmentationMixin:
                 grid = pv.ImageData(
                     dimensions=(nx, ny, nz),
                     spacing=(float(sp[2]), float(sp[1]), float(sp[0])),
-                    origin=(0.0, 0.0, oz),
+                    origin=origin,
                 )
                 grid.point_data["values"] = mask.flatten(order="C")
                 try:
@@ -269,6 +302,12 @@ class AiSegmentationMixin:
                     continue
                 if s is None or s.n_points == 0:
                     continue
+                if T is not None:
+                    try:
+                        ph = np.hstack([s.points, np.ones((s.n_points, 1))])
+                        s.points = (T @ ph.T).T[:, :3]
+                    except Exception:
+                        pass
                 try:
                     # Taubin(부피 보존) 표면 스무딩.
                     s = s.smooth_taubin(n_iter=20, pass_band=0.1)
