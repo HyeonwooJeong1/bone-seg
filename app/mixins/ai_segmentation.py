@@ -270,8 +270,8 @@ class AiSegmentationMixin:
                 if s is None or s.n_points == 0:
                     continue
                 try:
-                    # Taubin(부피 보존). 너무 키우면(20+) 얇은 부위에 구멍이 뚫려 15로.
-                    s = s.smooth_taubin(n_iter=15, pass_band=0.1)
+                    # Taubin(부피 보존) 표면 스무딩.
+                    s = s.smooth_taubin(n_iter=20, pass_band=0.1)
                 except Exception:
                     pass
                 color = _AI_COLORS.get(cid, (0.8, 0.8, 0.8))

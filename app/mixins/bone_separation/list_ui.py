@@ -307,13 +307,18 @@ class BoneListUIMixin:
         self.bone_list_widget.blockSignals(True)
         try:
             if not ctrl_held:
-                # 일반 클릭: 전부 해제 후 target만 선택
-                self.bone_list_widget.clearSelection()
+                # Normal click: clicking an already-selected bone deselects it
+                # (toggle); otherwise select only that bone.
+                target_item = None
                 for i in range(self.bone_list_widget.count()):
-                    item = self.bone_list_widget.item(i)
-                    if item.data(Qt.UserRole) == target_uid:
-                        item.setSelected(True)
+                    it = self.bone_list_widget.item(i)
+                    if it.data(Qt.UserRole) == target_uid:
+                        target_item = it
                         break
+                was_selected = target_item.isSelected() if target_item is not None else False
+                self.bone_list_widget.clearSelection()
+                if target_item is not None and not was_selected:
+                    target_item.setSelected(True)
             else:
                 # Ctrl+클릭: target만 토글, 나머지 그대로
                 for i in range(self.bone_list_widget.count()):
