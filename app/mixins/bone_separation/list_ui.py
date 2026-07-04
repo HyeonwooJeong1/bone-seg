@@ -112,7 +112,11 @@ class BoneListUIMixin:
         pass
 
     def on_toggle_bone_visibility_clicked(self):
-        """선택된 뼈의 visibility를 토글. Hide/Show 버튼 또는 H 키."""
+        """Toggle visibility of the selected bone(s). Hide/Show button or 'H' key.
+
+        The selection is cleared afterward so you don't have to click a second
+        time to deselect before choosing another bone.
+        """
         items = self.bone_list_widget.selectedItems()
         if not items:
             return
@@ -129,8 +133,10 @@ class BoneListUIMixin:
                     actor.SetVisibility(bool(bone['visible']))
                 except Exception:
                     pass
-            # 리스트 텍스트 업데이트 (● / ○)
+            # Update list text (● / ○)
             item.setText(self._bone_list_item_label(bone))
+        # Auto-deselect so a second click isn't needed (also clears highlight).
+        self.bone_list_widget.clearSelection()
         self.plotter.camera_position = cam_pos
         self.plotter.render()
 
@@ -213,9 +219,11 @@ class BoneListUIMixin:
             self._bone_click_press_pos = None
 
     def _on_3d_bone_release(self, obj, event):
-        """Mouse-up → 클릭인지 확인 후 뼈 선택.
-        Observer는 Restore Mode 토글 시점에만 등록되므로 일반 가드만 체크."""
+        """Mouse-up → if it was a click (not a drag), select the picked bone."""
         if not self.bone_separation_enabled or not self.separated_bones:
+            return
+        # If landmark picking is active, let that mode handle the click instead.
+        if getattr(self, 'landmark_picking_enabled', False):
             return
 
         try:

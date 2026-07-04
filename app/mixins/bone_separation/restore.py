@@ -166,7 +166,7 @@ class BoneRestoreMixin:
             n = len(bones_to_restore)
             print(f"[Restore] Executing on {n} bone(s), {self.restore_iterations} iters…")
             if hasattr(self, 'separation_status_label'):
-                self.separation_status_label.setText(f"복원 중: {n}개 뼈…")
+                self.separation_status_label.setText(f"Restoring: {n} bone(s)…")
                 try:
                     QApplication.processEvents()
                 except Exception:

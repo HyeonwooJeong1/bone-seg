@@ -586,18 +586,20 @@ class MainWindow(
         )
         self.separation_section.addWidget(self.separation_status_label)
 
-        # ── AI 뼈 분할 (번들 nnU-Net 통합모델) ──
-        self.separation_section.addWidget(QLabel("<b>AI 뼈 분할 (학습 모델)</b>"))
+        # ── AI Bone Segmentation (bundled nnU-Net model) ──
+        self.separation_section.addWidget(QLabel("<b>AI Bone Segmentation (trained model)</b>"))
         ai_btn_row = QHBoxLayout()
-        self.ai_seg_btn = QPushButton("AI 뼈 분할 실행")
+        self.ai_seg_btn = QPushButton("Run AI Segmentation")
         self.ai_seg_btn.setToolTip(
-            "번들된 nnU-Net 통합모델로 현재 환자 CT를 뼈별로 분할합니다.\n"
-            "GPU가 있으면 GPU, 없으면 CPU로 실행 (처음 1회는 수 분 소요, 이후 캐시)."
+            "Segment the current patient's CT into individual bones with the "
+            "bundled nnU-Net model.\n"
+            "Uses the GPU when available (first run per patient takes a few "
+            "minutes, then it is cached)."
         )
         self.ai_seg_btn.clicked.connect(self.apply_ai_segmentation)
         ai_btn_row.addWidget(self.ai_seg_btn)
-        self.ai_clear_btn = QPushButton("AI 끄기")
-        self.ai_clear_btn.setToolTip("AI 뼈를 지우고 threshold 렌더로 복원합니다.")
+        self.ai_clear_btn = QPushButton("Clear AI")
+        self.ai_clear_btn.setToolTip("Remove AI bones and restore the threshold rendering.")
         self.ai_clear_btn.clicked.connect(self.clear_ai_segmentation)
         ai_btn_row.addWidget(self.ai_clear_btn)
         self.separation_section.addLayout(ai_btn_row)
@@ -607,9 +609,9 @@ class MainWindow(
         self.bone_list_widget.setSelectionMode(QAbstractItemView.MultiSelection)
         self.bone_list_widget.setEnabled(False)
         self.bone_list_widget.setToolTip(
-            "클릭으로 선택/해제 (여러 개 가능).\n"
-            "3D 뷰에서 뼈 클릭해도 연동됨.\n"
-            "Double-click으로 이름 변경. 'H' 키로 숨기기/보이기."
+            "Click to select/deselect (multi-select supported).\n"
+            "Clicking a bone in the 3D view selects it here too.\n"
+            "Double-click to rename. Press 'H' to hide/show."
         )
         self.bone_list_widget.itemDoubleClicked.connect(self._on_bone_list_item_double_clicked)
         self.bone_list_widget.itemSelectionChanged.connect(self._on_bone_list_selection_changed)
@@ -624,7 +626,7 @@ class MainWindow(
 
         self.toggle_vis_btn = QPushButton("Hide/Show")
         self.toggle_vis_btn.setEnabled(False)
-        self.toggle_vis_btn.setToolTip("선택된 뼈의 표시/숨기기 전환 (H키도 가능)")
+        self.toggle_vis_btn.setToolTip("Show/hide the selected bone(s) (or press 'H').")
         self.toggle_vis_btn.clicked.connect(self.on_toggle_bone_visibility_clicked)
         sep_tools_row.addWidget(self.toggle_vis_btn)
 
@@ -653,9 +655,9 @@ class MainWindow(
         self.restore_pick_btn.setCheckable(True)
         self.restore_pick_btn.setEnabled(False)
         self.restore_pick_btn.setToolTip(
-            "켜면 뼈를 클릭해서 구멍을 메울 수 있음.\n"
-            "클릭할 때마다 closing이 누적 적용됨.\n"
-            "Undo로 되돌리기 가능."
+            "When on, click a bone to fill holes in it.\n"
+            "Each click applies closing cumulatively.\n"
+            "Use Undo to revert."
         )
         self.restore_pick_btn.toggled.connect(self.on_restore_picking_toggled)
         restore_btn_row.addWidget(self.restore_pick_btn)
@@ -678,10 +680,10 @@ class MainWindow(
         self.restore_iter_spinbox.setKeyboardTracking(False)
         self.restore_iter_spinbox.setSuffix(" vox")
         self.restore_iter_spinbox.setToolTip(
-            "최대 성장 거리 (voxel 단위).\n"
-            "  작게 (3~5): 표면 근처만 복원\n"
-            "  중간 (10): 기본, 대부분의 결손 처리\n"
-            "  크게 (20~50): 큰 결손도 채움 (느릴 수 있음)"
+            "Maximum growth distance (in voxels).\n"
+            "  Small (3-5): restore only near the surface\n"
+            "  Medium (10): default, handles most gaps\n"
+            "  Large (20-50): fills big gaps (can be slow)"
         )
         self.restore_iter_spinbox.valueChanged.connect(
             lambda v: setattr(self, 'restore_iterations', int(v))
@@ -697,13 +699,14 @@ class MainWindow(
         self.vote_threshold_spinbox.setKeyboardTracking(False)
         self.vote_threshold_spinbox.setSuffix(" HU")
         self.vote_threshold_spinbox.setToolTip(
-            "복원 기준 = (현재 threshold) − (이 값).\n"
-            "현재 threshold보다 HU가 낮지만 뼈일 가능성이 있는 voxel을 포함.\n\n"
-            "  0 = 현재 threshold와 동일 (기존 뼈만 유지, 추가 복원 없음)\n"
-            "  50 = 기본 (partial volume 보정, 안전)\n"
-            "  100~200 = 강하게 복원 (골다공증/얇은 뼈 복원)\n"
-            "  300+ = 매우 강력 (연조직까지 포함 위험)\n\n"
-            "예: threshold=200, offset=50 → HU ≥ 150인 voxel까지 복원"
+            "Restore cutoff = (current threshold) − (this value).\n"
+            "Includes voxels with HU below the current threshold that may still "
+            "be bone.\n\n"
+            "  0 = same as current threshold (no extra restore)\n"
+            "  50 = default (partial-volume correction, safe)\n"
+            "  100-200 = aggressive (osteoporotic / thin bone)\n"
+            "  300+ = very aggressive (may include soft tissue)\n\n"
+            "e.g. threshold=200, offset=50 → restore voxels with HU ≥ 150"
         )
         self.vote_threshold_spinbox.valueChanged.connect(
             lambda v: setattr(self, 'vote_threshold', int(v))
@@ -717,9 +720,9 @@ class MainWindow(
         self.merge_fill_btn = QPushButton("Merge && Fill Gap")
         self.merge_fill_btn.setEnabled(False)
         self.merge_fill_btn.setToolTip(
-            "뼈 목록에서 2개 이상 선택 (Ctrl+Click) 후 클릭.\n"
-            "뼈들을 하나로 합치고 사이의 빈 공간을 자연스럽게 채움.\n"
-            "Voxel-level closing으로 gap을 메운 뒤 re-mesh."
+            "Select 2+ bones in the list (Ctrl+click), then click.\n"
+            "Merges them into one and smoothly fills the space between.\n"
+            "Fills gaps with voxel-level closing, then re-meshes."
         )
         self.merge_fill_btn.clicked.connect(self.on_merge_fill_clicked)
         self.separation_section.addWidget(self.merge_fill_btn)
@@ -731,10 +734,10 @@ class MainWindow(
         self.merge_fill_iter_spinbox.setValue(self.merge_fill_iterations)
         self.merge_fill_iter_spinbox.setKeyboardTracking(False)
         self.merge_fill_iter_spinbox.setToolTip(
-            "뼈 사이 빈 공간을 채우는 closing 반복 횟수.\n"
-            "  3 = 작은 갭\n"
-            "  5 = 보통 갭 (기본)\n"
-            "  10+ = 큰 갭"
+            "Closing iterations used to fill the space between bones.\n"
+            "  3 = small gaps\n"
+            "  5 = medium gaps (default)\n"
+            "  10+ = large gaps"
         )
         self.merge_fill_iter_spinbox.valueChanged.connect(
             lambda v: setattr(self, 'merge_fill_iterations', int(v))
@@ -754,8 +757,8 @@ class MainWindow(
         self.voxel_cleanup_checkbox.setChecked(self.particle_removal_enabled)
         self.voxel_cleanup_checkbox.setToolTip(
             "Remove isolated voxel clusters from the bone mask BEFORE meshing.\n"
-            "Morphological opening (침식→팽창)으로 작은 noise 파티클을 제거.\n"
-            "iterations를 작게 유지하면 얇은 뼈는 보존됩니다."
+            "Morphological opening (erode → dilate) removes small noise particles.\n"
+            "Keep iterations small to preserve thin bones."
         )
         self.voxel_cleanup_checkbox.stateChanged.connect(self.on_voxel_cleanup_toggled)
         self.particle_section.addWidget(self.voxel_cleanup_checkbox)
@@ -768,11 +771,11 @@ class MainWindow(
         self.opening_iter_spinbox.setSingleStep(1)
         self.opening_iter_spinbox.setKeyboardTracking(False)
         self.opening_iter_spinbox.setToolTip(
-            "Opening 반복 횟수 (침식→팽창 커널 크기).\n"
+            "Opening iterations (erode → dilate kernel size).\n"
             "  0 = off\n"
-            "  1 = 1-voxel 돌출/파티클 제거 (권장)\n"
-            "  2 = 2-voxel 이하 제거 (얇은 뼈 주의)\n"
-            "값이 클수록 더 많이 제거되지만 얇은 뼈가 손상될 수 있음."
+            "  1 = remove 1-voxel spurs/particles (recommended)\n"
+            "  2 = remove clusters ≤ 2 voxels (careful with thin bone)\n"
+            "Higher removes more but can damage thin bones."
         )
         self.opening_iter_spinbox.valueChanged.connect(self.on_opening_iter_changed)
         iter_layout.addWidget(self.opening_iter_spinbox)

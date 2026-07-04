@@ -92,7 +92,7 @@ class AiSegmentationMixin:
         npz = self._ai_npz_path()
         if npz is None:
             if not silent:
-                QMessageBox.warning(self, "AI 분할", "먼저 환자를 선택/로드하세요.")
+                QMessageBox.warning(self, "AI Segmentation", "Load a patient first.")
             return None
         if os.path.exists(npz) and not force:
             return npz  # 캐시 사용
@@ -105,7 +105,8 @@ class AiSegmentationMixin:
         script = self._ai_infer_script()
         if not os.path.exists(script):
             if not silent:
-                QMessageBox.critical(self, "AI 분할", f"추론 스크립트 없음:\n{script}")
+                QMessageBox.critical(self, "AI Segmentation",
+                                     f"Inference script not found:\n{script}")
             return None
 
         # 추론 런타임 확인 (torch/nnunetv2). 없으면 안내하고 중단(캐시 환자는 계속 동작).
@@ -117,10 +118,11 @@ class AiSegmentationMixin:
         if not has_nnunet:
             if not silent:
                 QMessageBox.information(
-                    self, "AI 추론 환경 필요",
-                    "이 환경에는 AI 추론 런타임(torch/nnunetv2)이 없습니다.\n"
-                    "새 CT 자동 분할은 setup_and_run.bat로 만든 환경에서 실행하세요.\n"
-                    "(이미 분할된 환자는 캐시로 바로 표시됩니다.)")
+                    self, "AI runtime required",
+                    "This environment has no AI inference runtime (torch/nnU-Net).\n"
+                    "Run new-CT segmentation in the environment created by "
+                    "setup_and_run.bat.\n"
+                    "(Already-segmented patients still load instantly from cache.)")
             return None
 
         # device·folds 자동
@@ -136,9 +138,10 @@ class AiSegmentationMixin:
         cmd = [sys.executable, script, dicom_dir, npz,
                "--folds", str(folds), "--device", device]
         dlg = QProgressDialog(
-            f"AI 뼈 분할 추론 중… (device={device})\n처음 1회는 수 분 걸릴 수 있습니다.",
+            f"Running AI bone segmentation… (device={device})\n"
+            f"The first run for a patient may take a few minutes.",
             None, 0, 0, self)
-        dlg.setWindowTitle("AI 분할")
+        dlg.setWindowTitle("AI Segmentation")
         dlg.setWindowModality(Qt.WindowModal)
         dlg.setCancelButton(None)
         dlg.setMinimumDuration(0)
@@ -165,11 +168,11 @@ class AiSegmentationMixin:
                 pass
             if not silent:
                 QMessageBox.critical(
-                    self, "AI 분할 실패",
-                    f"추론 실패 (code {proc.returncode}).\n\n{err}")
-            self.statusBar().showMessage("AI 추론 실패", 5000)
+                    self, "AI Segmentation failed",
+                    f"Inference failed (code {proc.returncode}).\n\n{err}")
+            self.statusBar().showMessage("AI inference failed", 5000)
             return None
-        self.statusBar().showMessage("AI 추론 완료", 4000)
+        self.statusBar().showMessage("AI inference complete", 4000)
         return npz
 
     # ── ② npz 로드 + 시리즈 매칭 ─────────────────────────────────
@@ -231,7 +234,8 @@ class AiSegmentationMixin:
             blocks, id2name = self._load_ai_blocks(npz)
         except Exception as e:
             if not auto:
-                QMessageBox.critical(self, "AI 분할", f"라벨 로드 실패:\n{e}")
+                QMessageBox.critical(self, "AI Segmentation",
+                                     f"Failed to load labels:\n{e}")
             return
         if not blocks:
             return
@@ -288,7 +292,7 @@ class AiSegmentationMixin:
                 })
 
         if not self.separated_bones:
-            QMessageBox.warning(self, "AI 분할", "표시할 뼈가 없습니다.")
+            QMessageBox.warning(self, "AI Segmentation", "No bones to display.")
             self._restore_volume_after_ai()
             return
 
@@ -301,6 +305,9 @@ class AiSegmentationMixin:
             self.separation_status_label.setText(
                 f"AI: {len(self.separated_bones)} bone(s)")
         self._refresh_separation_list()
+        # Enable click-to-select in the 3D view (click a bone -> selected in list)
+        if hasattr(self, "_enable_bone_click_selection"):
+            self._enable_bone_click_selection()
         try:
             if not getattr(self, "_camera_initialized", False):
                 self.plotter.reset_camera()
@@ -325,7 +332,9 @@ class AiSegmentationMixin:
                 pass
 
     def clear_ai_segmentation(self):
-        """AI 뼈 제거 + threshold volume 복원."""
+        """Remove AI bones and restore the threshold volume rendering."""
+        if hasattr(self, "_disable_bone_click_selection"):
+            self._disable_bone_click_selection()
         self._clear_separated_actors()
         self.separated_bones = []
         self.ai_segmentation_active = False
