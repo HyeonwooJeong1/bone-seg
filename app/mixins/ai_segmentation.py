@@ -38,6 +38,29 @@ _AI_COLORS = {
 
 class AiSegmentationMixin:
 
+    # ── AI 우선 모드: 옛 뼈구분 UI 숨김 ─────────────────────────
+    def _enter_ai_first_mode(self):
+        """HU threshold·smoothing·particle 등 옛 뼈구분 UI를 숨긴다(코드는 보존).
+
+        AI가 기본 뼈 소스이므로 threshold 슬라이더·smoothing·particle 제거,
+        그리고 Bone Editor 안의 기하학적 분리(Separate Bones)·closing·fill holes도 숨김.
+        랜드마크·뼈목록·크롭·세션·시리즈 선택 등은 유지.
+        """
+        legacy = [
+            "_lbl_thr1", "_lbl_thr2", "min_slider", "min_spinbox",
+            "_lbl_smoothing", "smooth_combo", "particle_section",
+            "separate_btn", "clear_separation_btn",
+            "sep_stage_a_checkbox", "closing_checkbox", "_closing_iter_widget",
+            "fill_holes_checkbox", "_holes_size_widget", "min_bone_vox_spinbox",
+        ]
+        for attr in legacy:
+            w = getattr(self, attr, None)
+            if w is not None:
+                try:
+                    w.setVisible(False)
+                except Exception:
+                    pass
+
     # ── 경로/상태 ────────────────────────────────────────────────
     def _ai_npz_path(self):
         """현재 환자의 AI 라벨 캐시 npz 경로."""
@@ -53,24 +76,30 @@ class AiSegmentationMixin:
         return os.path.join(here, "ai_bone", "infer_app.py")
 
     # ── ① 추론 실행 (없으면 생성) ────────────────────────────────
-    def run_ai_inference(self, folds=None, force=False):
+    def run_ai_inference(self, folds=None, force=False, silent=False, cache_only=False):
         """infer_app.py를 subprocess로 실행해 <환자>_ai_labels.npz 생성.
 
         folds=None → GPU면 5-fold, CPU면 단일 fold 자동. force=True면 캐시 무시.
+        silent=True → 팝업 없이 실패 시 조용히 None 반환(자동 로드용).
+        cache_only=True → 캐시가 있으면 그 경로, 없으면 추론하지 않고 None(자동 로드용).
         """
         npz = self._ai_npz_path()
         if npz is None:
-            QMessageBox.warning(self, "AI 분할", "먼저 환자를 선택/로드하세요.")
+            if not silent:
+                QMessageBox.warning(self, "AI 분할", "먼저 환자를 선택/로드하세요.")
             return None
         if os.path.exists(npz) and not force:
             return npz  # 캐시 사용
+        if cache_only:
+            return None  # 캐시 없음 → 자동모드에선 추론 생략
 
         pid = self.patient_combo.currentText()
         from app.constants import BASE_DATA_DIR
         dicom_dir = os.path.join(BASE_DATA_DIR, pid)
         script = self._ai_infer_script()
         if not os.path.exists(script):
-            QMessageBox.critical(self, "AI 분할", f"추론 스크립트 없음:\n{script}")
+            if not silent:
+                QMessageBox.critical(self, "AI 분할", f"추론 스크립트 없음:\n{script}")
             return None
 
         # device·folds 자동
@@ -94,9 +123,10 @@ class AiSegmentationMixin:
         finally:
             QApplication.restoreOverrideCursor()
         if proc.returncode != 0 or not os.path.exists(npz):
-            QMessageBox.critical(
-                self, "AI 분할 실패",
-                f"추론 실패 (code {proc.returncode}).\n\n{proc.stderr[-1500:]}")
+            if not silent:
+                QMessageBox.critical(
+                    self, "AI 분할 실패",
+                    f"추론 실패 (code {proc.returncode}).\n\n{proc.stderr[-1500:]}")
             self.statusBar().showMessage("AI 추론 실패", 5000)
             return None
         self.statusBar().showMessage("AI 추론 완료", 4000)
@@ -143,18 +173,28 @@ class AiSegmentationMixin:
         return None
 
     # ── ③ 라벨 → 뼈별 의미론적 메시 표시 ─────────────────────────
-    def apply_ai_segmentation(self):
-        """현재 시리즈에 AI 라벨을 적용 — 뼈마다 색·이름 메시로 표시."""
-        npz = self.run_ai_inference()   # 없으면 생성, 있으면 캐시
+    def apply_ai_segmentation(self, auto=False):
+        """현재 시리즈에 AI 라벨을 적용 — 뼈마다 색·이름 메시로 표시.
+
+        auto=True(로드시 자동): 팝업 없이, 실패하면 조용히 기존 렌더 유지.
+        """
+        # 자동(로드시)엔 캐시 있을 때만; 버튼 클릭(auto=False)이면 없으면 추론 실행
+        npz = self.run_ai_inference(silent=auto, cache_only=auto)
         if npz is None:
             return
-        blocks, id2name = self._load_ai_blocks(npz)
+        try:
+            blocks, id2name = self._load_ai_blocks(npz)
+        except Exception as e:
+            if not auto:
+                QMessageBox.critical(self, "AI 분할", f"라벨 로드 실패:\n{e}")
+            return
         blk = self._match_ai_block(blocks)
         if blk is None:
-            QMessageBox.warning(
-                self, "AI 분할",
-                "현재 시리즈에 맞는 AI 라벨 블록을 찾지 못했습니다.\n"
-                "(다른 시리즈/스테이션을 선택해 보세요.)")
+            if not auto:
+                QMessageBox.warning(
+                    self, "AI 분할",
+                    "현재 시리즈에 맞는 AI 라벨 블록을 찾지 못했습니다.\n"
+                    "(다른 시리즈/스테이션을 선택해 보세요.)")
             return
 
         # 기존 뼈/메시 actor 정리 + volume 숨김

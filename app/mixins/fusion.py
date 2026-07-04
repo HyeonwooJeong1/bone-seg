@@ -234,6 +234,14 @@ class FusionMixin:
         if hasattr(self, '_refresh_slice_viewer'):
             self._refresh_slice_viewer()
 
+        # AI 우선 모드: 이 시리즈가 준비되면 자동으로 AI 뼈 분할 적용.
+        # (캐시 있으면 즉시, 없으면 조용히 스킵 — 실패해도 기존 렌더 유지)
+        if getattr(self, 'ai_first_mode', False):
+            try:
+                self.apply_ai_segmentation(auto=True)
+            except Exception as e:
+                print(f"[auto-AI] {e}")
+
         # Update info window
         meta = self.current_meta_info
         if meta:

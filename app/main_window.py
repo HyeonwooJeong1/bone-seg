@@ -190,6 +190,10 @@ class MainWindow(
         self.separated_bones = []
         # AI 뼈 분할(학습 모델) 활성 여부
         self.ai_segmentation_active = False
+        # AI 우선 모드: 로드 시 자동 AI 분할 + 옛 threshold/분리 UI 숨김
+        self.ai_first_mode = True
+        from PyQt5.QtCore import QTimer
+        QTimer.singleShot(0, self._enter_ai_first_mode)
         # Phase 2: apply mesh-level Stage A to each bone when separating
         self.separation_apply_stage_a = False
         # Snapshot of the original single-mesh actor's visibility so we can
@@ -410,7 +414,8 @@ class MainWindow(
         self.axes_checkbox.stateChanged.connect(self.on_axes_toggled)
         self.control_layout.addWidget(self.axes_checkbox)
 
-        self.control_layout.addWidget(QLabel("Smoothing:"))
+        self._lbl_smoothing = QLabel("Smoothing:")
+        self.control_layout.addWidget(self._lbl_smoothing)
         self.smooth_combo = QComboBox()
         self.smooth_combo.addItems([
             "None (Raw)", "Light", "Strong"
@@ -428,9 +433,11 @@ class MainWindow(
         # 3) Thresholds (always visible — most frequently used)
         # ============================================================
         self.control_layout.addSpacing(8)
-        self.control_layout.addWidget(QLabel("<b>Bone Threshold</b>"))
+        self._lbl_thr1 = QLabel("<b>Bone Threshold</b>")
+        self.control_layout.addWidget(self._lbl_thr1)
 
-        self.control_layout.addWidget(QLabel("Higher = only dense bone:"))
+        self._lbl_thr2 = QLabel("Higher = only dense bone:")
+        self.control_layout.addWidget(self._lbl_thr2)
         min_layout = QHBoxLayout()
         self.min_slider = QSlider(Qt.Horizontal)
         self.min_slider.setRange(-1000, 3000)
