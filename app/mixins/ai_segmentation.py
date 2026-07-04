@@ -131,7 +131,7 @@ class AiSegmentationMixin:
         except Exception:
             device = "cpu"
         if folds is None:
-            folds = "0,1,2,3,4" if device == "cuda" else "0"
+            folds = "0"   # 단일 fold = 빠름(정확도 충분). 더 높이려면 "0,1,2" 등.
 
         cmd = [sys.executable, script, dicom_dir, npz,
                "--folds", str(folds), "--device", device]

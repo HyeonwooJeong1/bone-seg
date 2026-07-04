@@ -185,7 +185,7 @@ def run_predict(in_dir, out_dir, model_dir, folds, device):
     print(f"[infer_app] device={dev} folds={folds}", flush=True)
 
     predictor = nnUNetPredictor(
-        tile_step_size=0.5, use_gaussian=True, use_mirroring=False,
+        tile_step_size=0.7, use_gaussian=True, use_mirroring=False,
         perform_everything_on_device=(dev.type == "cuda"),
         device=dev, verbose=False, verbose_preprocessing=False, allow_tqdm=True)
     predictor.initialize_from_trained_model_folder(
