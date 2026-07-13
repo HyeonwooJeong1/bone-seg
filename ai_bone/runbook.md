@@ -109,6 +109,8 @@ mkdir -p /data1/bone/raw/{totalseg,verse,ctspine1k,ribseg,ctpelvic1k,spinemets,m
 각 다운로드 스크립트는 HTTP Range 재개(resume)를 지원합니다.
 중단 후 동일 명령을 재실행하면 이어받습니다.
 
+> **⚠ 아직 미구현 CLI:** `ai_bone/download.py`는 현재 함수(`download_file`, `parse_zenodo_manifest`)만 제공합니다. 아래 `python -m ai_bone.download ...` 명령을 쓰려면 먼저 이 함수들을 호출하는 `__main__` CLI 래퍼(데이터셋별 URL 목록→다운로드)를 추가해야 합니다. 그 전에는 짧은 스크립트로 함수를 직접 호출하십시오.
+
 **TotalSegmentator v2 (앵커 FT, ~40GB, Zenodo)**
 
 ```bash
@@ -231,6 +233,8 @@ done
 **예상 시간:** 데이터셋 크기에 따라 수 시간 (I/O 병목)
 
 ### 3-A. CADS → Dataset500_AxialPretrain (사전학습)
+
+> **⚠ 아직 미구현 CLI:** `ai_bone/build_raw.py`는 현재 `write_dataset_json`/`write_present_sidecar`만 제공합니다. 아래 `--stage` end-to-end 파이프라인(케이스 glob → `harmonize_case` → `verify_case` 게이트 → raw 조립)은 아직 배선되지 않았습니다. 실제 데이터 확보 후 이 오케스트레이션 CLI를 추가한 뒤 실행하십시오. (구성 블록은 이미 Task 4/5/7/8에 존재)
 
 ```bash
 python -m ai_bone.build_raw \
@@ -516,6 +520,8 @@ done
 Stage 2 baseline checkpoint(또는 Stage 1 shared init)를 기준으로
 각 FT 데이터셋의 gradient 방향을 추출합니다.
 
+> **⚠ 서버 스텁:** 실제 gradient 추출 로직(nnU-Net predictor 연결 부분)은 서버 nnunetv2 설치 환경에서 확정 후 실행하십시오.
+
 ```bash
 python -m ai_bone.merit.estimate_conflict \
   --init $nnUNet_results/Dataset500_AxialPretrain/\
@@ -529,7 +535,6 @@ nnUNetTrainerNoMirroring_ES_PL__nnUNetPlans_iso06__3d_fullres/fold_all/checkpoin
 
 > **GPU 필요:** `estimate_conflict.py`는 서버 GPU에서 실행합니다.
 > `--batches 8`은 각 데이터셋에서 8 mini-batch의 gradient를 평균합니다.
-> 실제 gradient 추출 로직(nnU-Net predictor 연결 부분)은 서버 nnunetv2 설치 환경에서 확정 후 실행하십시오.
 
 완료 확인:
 
