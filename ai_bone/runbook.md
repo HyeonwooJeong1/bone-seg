@@ -109,7 +109,9 @@ mkdir -p /data1/bone/raw/{totalseg,verse,ctspine1k,ribseg,ctpelvic1k,spinemets,m
 각 다운로드 스크립트는 HTTP Range 재개(resume)를 지원합니다.
 중단 후 동일 명령을 재실행하면 이어받습니다.
 
-> **⚠ 아직 미구현 CLI:** `ai_bone/download.py`는 현재 함수(`download_file`, `parse_zenodo_manifest`)만 제공합니다. 아래 `python -m ai_bone.download ...` 명령을 쓰려면 먼저 이 함수들을 호출하는 `__main__` CLI 래퍼(데이터셋별 URL 목록→다운로드)를 추가해야 합니다. 그 전에는 짧은 스크립트로 함수를 직접 호출하십시오.
+> **다운로드 CLI (배선됨, GPU 불필요):** `python -m ai_bone.download <name|all> --dest <dir> [--force]`.
+> 데이터셋별 소스는 `ai_bone/datasets/sources.py`에 등록돼 있습니다.
+> **⚠ 소스 ID 미검증:** 모든 소스가 `verified: False`라 `--force` 없이는 다운로드하지 않고 landing URL만 출력합니다. **먼저 landing URL에서 Zenodo record 번호 등 실제 값을 확인**하고 `sources.py`를 고친 뒤 `--force`로 실행하십시오. `method: "manual"`(CADS=HuggingFace, Spine-Mets=TCIA, CTSpine1K=GDrive, MUG500=Figshare)은 자동 다운로드 대신 안내만 출력합니다 — 각 landing에서 해당 클라이언트로 받으십시오.
 
 **TotalSegmentator v2 (앵커 FT, ~40GB, Zenodo)**
 
@@ -234,7 +236,9 @@ done
 
 ### 3-A. CADS → Dataset500_AxialPretrain (사전학습)
 
-> **⚠ 아직 미구현 CLI:** `ai_bone/build_raw.py`는 현재 `write_dataset_json`/`write_present_sidecar`만 제공합니다. 아래 `--stage` end-to-end 파이프라인(케이스 glob → `harmonize_case` → `verify_case` 게이트 → raw 조립)은 아직 배선되지 않았습니다. 실제 데이터 확보 후 이 오케스트레이션 CLI를 추가한 뒤 실행하십시오. (구성 블록은 이미 Task 4/5/7/8에 존재)
+> **빌드 CLI (배선됨, GPU 불필요):** `python -m ai_bone.build_raw --pairs <pairs.json> --dataset <name> --out <raw_dir>`.
+> end-to-end로 각 케이스에 `harmonize_case`(remap+정합+iso0.6) → `verify_case` 게이트 → `imagesTr/<id>_0000.nii.gz` + `labelsTr/<id>.nii.gz` + present sidecar → `dataset.json`을 씁니다. 게이트 실패 케이스는 건너뛰고 로그로 남깁니다.
+> **⚠ pairs 매니페스트는 사용자가 작성:** `--pairs`는 `[[ct_path, seg_path, case_id], ...]` JSON입니다. **CT 파일 선택 버그 방지를 위해 (한 폴더에 여러 부위 CT가 있을 수 있음) 어떤 CT↔seg가 짝인지 명시적으로 나열**합니다. 다운로드 폴더 구조를 확인한 뒤 데이터셋별로 이 목록을 만드십시오(간단한 glob 스크립트로 생성 가능).
 
 ```bash
 python -m ai_bone.build_raw \
