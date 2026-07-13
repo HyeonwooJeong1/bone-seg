@@ -23,16 +23,18 @@ SOURCES = {
     },
     # Expert GT (fine-tune)
     "totalseg": {
-        "method": "zenodo", "record": "10047292", "verified": False,
+        "method": "zenodo", "record": "10047292", "verified": True,
         "landing_url": "https://zenodo.org/records/10047292",
-        "notes": "TotalSegmentator v2 training data (1204). CONFIRM record id "
-                 "on the landing page before download (CC BY 4.0).",
+        "notes": "TotalSegmentatorV2: 1228 CT, 117 structures, CC BY 4.0. Record "
+                 "id confirmed. The internal bone label VALUES are still confirmed "
+                 "at build time via the verify_dataset overlap gate.",
     },
     "verse": {
-        "method": "zenodo", "record": "10159290", "verified": False,
+        "method": "manual", "verified": False,
         "landing_url": "https://github.com/anjany/verse",
-        "notes": "VerSe'19/'20. Data hosted via the GitHub repo's links / OSF / "
-                 "Zenodo — confirm the actual record before download.",
+        "notes": "VerSe'19/'20 (Nature Sci Data s41597-021-01060-0). Imaging data "
+                 "is distributed via the GitHub repo's OSF links (Zenodo 3759104 is "
+                 "only the challenge design doc). Download per the repo instructions.",
     },
     "ctspine1k": {
         "method": "manual", "verified": False,
@@ -41,15 +43,18 @@ SOURCES = {
                  "the repo's download scripts + Google Drive label links.",
     },
     "ribseg": {
-        "method": "zenodo", "record": "3893508", "verified": False,
+        "method": "manual", "verified": False,
         "landing_url": "https://github.com/M3DV/RibSeg",
-        "notes": "RibSeg v2 masks build on RibFrac CT (Zenodo). Confirm the "
-                 "RibFrac image records + RibSeg label release.",
+        "notes": "Two-part source: (1) CT images = RibFrac on Zenodo — train "
+                 "records 3893508 (part1, 300) + 3893498 (part2, 120) + 3893496 "
+                 "(val, 80); (2) RIB SEGMENTATION masks = RibSeg v2 release from "
+                 "the RibSeg repo (NOT RibFrac's fracture labels). Fetch both.",
     },
     "ctpelvic1k": {
-        "method": "zenodo", "record": "4588403", "verified": False,
-        "landing_url": "https://github.com/MIRACLE-Center/CTPelvic1K",
-        "notes": "Annotations + new clinical data via a Zenodo link; confirm id.",
+        "method": "zenodo", "record": "4588403", "verified": True,
+        "landing_url": "https://zenodo.org/records/4588403",
+        "notes": "CTPelvic1K annotations + clinical data (sacrum/L+R hip; lumbar "
+                 "grouped→ignore). Record id confirmed.",
     },
     "spinemets": {
         "method": "manual", "verified": False,

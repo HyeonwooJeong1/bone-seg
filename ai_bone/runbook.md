@@ -903,3 +903,60 @@ tail -f /data1/bone/logs/stage1_gpu0.log
 | 학습 Loss=NaN | LR 너무 크거나 ignore_label 처리 오류 | checkpoint_latest에서 재개; LR 확인 |
 | `checkpoint_final.pth` 없음 | 학습 미완료 또는 ES 미발동 | 로그 확인 후 --c 재실행 |
 | Zenodo 다운로드 느림 | 단일 연결 ~1.6MB/s | `--parallel 8` (8 초과 금지) |
+
+---
+
+## 10. 풀 학습 (2 GPU, 최대 가동)
+
+시간이 더 걸려도 전 fold·전 데이터셋을 돌리고 GPU를 거의 풀로 쓰고 싶을 때. 의존성 때문에 **3단계**로 나눠 실행하되, 각 단계에서 2 GPU를 최대한 채운다.
+
+### 학습할 잡 목록 (풀)
+- 사전학습 1개: `Dataset500` fold `all`
+- baseline 5개: `Dataset510` fold 0–4
+- MERIT: 파티션(520/521…) × fold 0–4  (split 결과에 따라 K개)
+
+### Phase 1 — 사전학습: 한 모델에 2 GPU (DDP)
+단일 모델이라 큐로 나눌 수 없으니 **nnU-Net DDP로 2장을 한 모델에** 투입 → 두 GPU 모두 가동.
+```bash
+source ~/miniforge3/etc/profile.d/conda.sh && conda activate pt210_py312
+export nnUNet_raw=/data1/bone/nnunet/raw nnUNet_preprocessed=/home/ubuntu/nnunet_pre \
+       nnUNet_results=/data1/bone/nnunet/results
+export LD_LIBRARY_PATH=$CONDA_PREFIX/lib:$LD_LIBRARY_PATH nnUNet_compile=f nnUNet_n_proc_DA=32
+CUDA_VISIBLE_DEVICES=0,1 nnUNetv2_train 500 3d_fullres all \
+  -p nnUNetPlans_iso06 -tr nnUNetTrainerNoMirroring_ES_PL -num_gpus 2 --c
+```
+
+### Phase 2 — baseline 5 fold: 2 GPU 잡 큐
+`jobs_baseline.txt` (PRETRAINED = Phase1 결과 checkpoint):
+```
+510 3d_fullres 0 nnUNetTrainerNoMirroring_ES_PL /data1/bone/nnunet/results/Dataset500_AxialPretrain/nnUNetTrainerNoMirroring_ES_PL__nnUNetPlans_iso06__3d_fullres/fold_all/checkpoint_final.pth
+510 3d_fullres 1 nnUNetTrainerNoMirroring_ES_PL <같은 checkpoint>
+510 3d_fullres 2 nnUNetTrainerNoMirroring_ES_PL <같은 checkpoint>
+510 3d_fullres 3 nnUNetTrainerNoMirroring_ES_PL <같은 checkpoint>
+510 3d_fullres 4 nnUNetTrainerNoMirroring_ES_PL <같은 checkpoint>
+```
+```bash
+nohup bash ai_bone/train/run_queue.sh "0,1" jobs_baseline.txt > /data1/bone/train_logs/queue_baseline.log 2>&1 &
+```
+→ fold를 GPU 0/1에 라운드로빈(3+2)으로 순차 실행, 각 GPU는 한 번에 한 모델(=풀 가동), `--c` 재개.
+
+### Phase 3 — MERIT: split 후 파티션×fold 큐
+`estimate_conflict.py`→`split.py`로 `partitions.json`을 만들고, 파티션별로 `build_raw`로 `Dataset520/521…`을 만든 뒤, `jobs_merit.txt`에 `520/521 … fold0-4 nnUNetTrainerMERITFinetune <checkpoint>`를 넣어 동일하게:
+```bash
+nohup bash ai_bone/train/run_queue.sh "0,1" jobs_merit.txt > /data1/bone/train_logs/queue_merit.log 2>&1 &
+```
+
+### GPU 이용률(%)을 더 끌어올리는 레버
+H100은 nnU-Net 기본 patch/batch에 여유가 남습니다. 시간이 되면:
+1. **큰 batch/patch로 재plan**(VRAM·연산 더 사용) — 새 plans로:
+   ```bash
+   nnUNetv2_plan_experiment -d 500 510 -overwrite_target_spacing 0.6 0.6 0.6 \
+     -gpu_memory_target 70 -overwrite_plans_name nnUNetPlans_iso06_big
+   nnUNetv2_preprocess -d 500 510 -plans_name nnUNetPlans_iso06_big -c 3d_fullres -np 32
+   ```
+   이후 스크립트/큐의 `-p`를 `nnUNetPlans_iso06_big`으로 바꿔 사용.
+2. **`nnUNet_n_proc_DA` 상향**(기본 24) — GPU가 augmentation 대기로 굶주리면 32~48까지. 124코어라 2 job이면 여유.
+3. **완전 학습(ES 미발동)** — 조기종료 없이 1000 epoch를 다 돌리려면 ES 완화가 필요. `nnUNetTrainerNoMirroring_ES_PL`은 `es_min_epochs=200`/`es_patience=75`이므로, 끝까지 돌리려면 커스텀 trainer에서 `es_patience`를 크게(예: 10^9) 두거나 `num_epochs`만 쓰는 non-ES trainer를 만들면 됩니다.
+
+### 시간 감
+epoch은 데이터 크기와 무관(250 iter 고정). 잡 1개 ES 수렴 ~12–24h 가정 시, 2 GPU로 baseline 5개≈3라운드, MERIT(K=2)10개≈5라운드 → 대략 **1–2주**면 풀 세트 완주. `nvidia-smi`로 두 GPU가 계속 차 있는지 확인.
