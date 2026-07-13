@@ -31,15 +31,17 @@ def download_dataset(name, dest_root, session=None, force=False, logf=print):
         if session is None:
             import requests
             session = requests.Session()
-        rec_url = f"https://zenodo.org/api/records/{src['record']}"
-        with session.get(rec_url, stream=False, headers={}, timeout=60) as r:
-            r.raise_for_status()
-            record_json = r.json()
+        records = src.get("records") or [src["record"]]   # one or many
         out = []
-        for entry in parse_zenodo_manifest(record_json):
-            dest = os.path.join(dest_root, name, entry["name"])
-            logf(f"[{name}] downloading {entry['name']} ...")
-            out.append(str(download_file(entry["url"], dest, session=session)))
+        for rec in records:
+            rec_url = f"https://zenodo.org/api/records/{rec}"
+            with session.get(rec_url, stream=False, headers={}, timeout=60) as r:
+                r.raise_for_status()
+                record_json = r.json()
+            for entry in parse_zenodo_manifest(record_json):
+                dest = os.path.join(dest_root, name, entry["name"])
+                logf(f"[{name}] record {rec}: downloading {entry['name']} ...")
+                out.append(str(download_file(entry["url"], dest, session=session)))
         return out
     logf(f"[{name}] unknown method {src['method']!r}")
     return []

@@ -45,6 +45,17 @@ SOURCES = {
         "notes": "Images pulled from public sources (COLONOG, MSD, etc.) via "
                  "the repo's download scripts + Google Drive label links.",
     },
+    # RibFrac CT images (auto). Confirmed Zenodo records. NOTE: each record also
+    # ships ribfrac-*-labels.zip = FRACTURE labels (ignore those); the rib
+    # SEGMENTATION masks we need are the separate RibSeg release (see "ribseg").
+    "ribfrac_ct": {
+        "method": "zenodo",
+        "records": ["3893508", "3893498", "3893496"], "verified": True,
+        "landing_url": "https://zenodo.org/records/3893508",
+        "notes": "RibFrac CT: 3893508 train-p1 (300) + 3893498 train-p2 (120) + "
+                 "3893496 val (80). Use ribfrac-train-images-*.zip; the rib "
+                 "segmentation masks come from RibSeg (dataset 'ribseg').",
+    },
     "ribseg": {
         "method": "manual", "verified": False,
         "landing_url": "https://github.com/HINTLab/RibSeg",

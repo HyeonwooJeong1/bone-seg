@@ -111,7 +111,13 @@ mkdir -p /data1/bone/raw/{totalseg,verse,ctspine1k,ribseg,ctpelvic1k,spinemets,m
 
 > **다운로드 CLI (배선됨, GPU 불필요):** `python -m ai_bone.download <name|all> --dest <dir> [--force]`.
 > 데이터셋별 소스는 `ai_bone/datasets/sources.py`에 등록돼 있습니다.
-> **⚠ 소스 ID 미검증:** 모든 소스가 `verified: False`라 `--force` 없이는 다운로드하지 않고 landing URL만 출력합니다. **먼저 landing URL에서 Zenodo record 번호 등 실제 값을 확인**하고 `sources.py`를 고친 뒤 `--force`로 실행하십시오. `method: "manual"`(CADS=HuggingFace, Spine-Mets=TCIA, CTSpine1K=GDrive, MUG500=Figshare)은 자동 다운로드 대신 안내만 출력합니다 — 각 landing에서 해당 클라이언트로 받으십시오.
+> **자동 다운로드 (verified, record 확인됨):** `totalseg`(Zenodo 10047292), `ctpelvic1k`(4588403), `ribfrac_ct`(RibFrac CT = 3893508/3893498/3893496 다중 record) — 바로 받아집니다:
+> ```bash
+> python -m ai_bone.download ribfrac_ct --dest /data1/bone/raw
+> ```
+> **수동 (auth/특수 클라이언트 필요):** `cads`(HuggingFace), `spinemets`(TCIA), `verse`(OSF: osf.io/nqjyw·t98fz), `ctspine1k`(GDrive), `mug500`(Figshare), 그리고 **RibSeg 늑골 마스크**(RibSeg v2 = GDrive / v1 = Zenodo 5336592). 이들은 CLI가 안내만 출력하니 각 landing에서 받으십시오.
+> **⚠ 미검증 소스:** `verified: False`인 항목은 `--force` 없이는 landing URL만 출력합니다. landing에서 실제 값 확인 후 `sources.py`의 `verified`를 True로 바꾸거나 `--force`로 실행하십시오.
+> **주의:** `ribfrac_ct` 각 record엔 `ribfrac-*-labels.zip`(=골절 라벨)도 들어있습니다 — 이건 무시하고 `ribfrac-train-images-*.zip`(CT)만 쓰고, 늑골 분할 마스크는 RibSeg에서 별도로 받으십시오.
 
 **TotalSegmentator v2 (앵커 FT, ~40GB, Zenodo)**
 

@@ -34,3 +34,10 @@ def test_zenodo_force_downloads(tmp_path):
     assert len(out) == 1
     p = tmp_path / "totalseg" / "a.bin"
     assert p.exists() and p.read_bytes() == b"abc"
+
+def test_zenodo_multirecord_loops_all_records(tmp_path):
+    # ribfrac_ct has 3 records; each fake record yields 1 file → 3 downloads.
+    sess = _Sess(_MANIFEST)
+    out = download_dataset("ribfrac_ct", str(tmp_path), session=sess, force=True, logf=lambda *a: None)
+    assert len(out) == 3
+    assert (tmp_path / "ribfrac_ct" / "a.bin").exists()

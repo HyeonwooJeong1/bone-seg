@@ -11,7 +11,12 @@ def test_source_entries_well_formed():
         assert isinstance(src["verified"], bool)
         assert src.get("landing_url")
         if src["method"] == "zenodo":
-            assert src.get("record")
+            assert src.get("record") or src.get("records")
+
+def test_ribfrac_ct_is_auto_multirecord():
+    src = SOURCES["ribfrac_ct"]
+    assert src["method"] == "zenodo" and src["verified"] is True
+    assert src["records"] == ["3893508", "3893498", "3893496"]
 
 def test_get_source_unknown_raises():
     import pytest
