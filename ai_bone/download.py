@@ -8,7 +8,7 @@ def parse_zenodo_manifest(record_json: dict):
     return out
 
 def download_dataset(name, dest_root, session=None, force=False, logf=print,
-                     allow_patterns=None):
+                     allow_patterns=None, max_workers=None):
     """Download one dataset's files per its registered source.
 
     - "zenodo": fetch the record manifest and download every file (resumable).
@@ -35,6 +35,7 @@ def download_dataset(name, dest_root, session=None, force=False, logf=print,
             repo_id=src["repo_id"], repo_type="dataset",
             local_dir=os.path.join(dest_root, name),
             allow_patterns=allow_patterns or src.get("allow_patterns"),
+            max_workers=max_workers or 4,   # fewer concurrent HEADs → fewer 429s
         )
         return [str(path)]
     if src["method"] == "zenodo":
@@ -87,10 +88,13 @@ def main():
                     help="download even if the source is marked unverified")
     ap.add_argument("--allow", nargs="*", default=None,
                     help="huggingface allow_patterns (subsample, e.g. a shard glob)")
+    ap.add_argument("--max-workers", type=int, default=None,
+                    help="huggingface concurrent workers (lower = fewer 429s)")
     args = ap.parse_args()
     names = list(SOURCES) if args.name == "all" else [args.name]
     for n in names:
-        download_dataset(n, args.dest, force=args.force, allow_patterns=args.allow)
+        download_dataset(n, args.dest, force=args.force, allow_patterns=args.allow,
+                         max_workers=args.max_workers)
 
 
 if __name__ == "__main__":
