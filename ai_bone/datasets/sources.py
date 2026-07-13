@@ -32,9 +32,12 @@ SOURCES = {
     "verse": {
         "method": "manual", "verified": False,
         "landing_url": "https://github.com/anjany/verse",
-        "notes": "VerSe'19/'20 (Nature Sci Data s41597-021-01060-0). Imaging data "
-                 "is distributed via the GitHub repo's OSF links (Zenodo 3759104 is "
-                 "only the challenge design doc). Download per the repo instructions.",
+        "urls": ["https://osf.io/nqjyw/", "https://osf.io/t98fz/"],
+        "notes": "3D CT+masks are on OSF, NOT Zenodo: VerSe'19 = osf.io/nqjyw, "
+                 "VerSe'20 = osf.io/t98fz (rawdata=CT .nii.gz, derivatives=seg "
+                 "masks + centroid .json). Zenodo 3759104 is only the challenge "
+                 "doc and 8115942 is 2D projections — neither is the volume data. "
+                 "Download via `osfclient` or the browser.",
     },
     "ctspine1k": {
         "method": "manual", "verified": False,
@@ -44,11 +47,15 @@ SOURCES = {
     },
     "ribseg": {
         "method": "manual", "verified": False,
-        "landing_url": "https://github.com/M3DV/RibSeg",
-        "notes": "Two-part source: (1) CT images = RibFrac on Zenodo — train "
-                 "records 3893508 (part1, 300) + 3893498 (part2, 120) + 3893496 "
-                 "(val, 80); (2) RIB SEGMENTATION masks = RibSeg v2 release from "
-                 "the RibSeg repo (NOT RibFrac's fracture labels). Fetch both.",
+        "landing_url": "https://github.com/HINTLab/RibSeg",
+        "ribfrac_records": ["3893508", "3893498", "3893496"],
+        "notes": "Two-part source. (1) CT images = RibFrac on Zenodo — train "
+                 "3893508 (part1, 300) + 3893498 (part2, 120) + 3893496 (val, 80); "
+                 "these ARE zenodo-automatable if you add them as separate entries. "
+                 "(2) RIB SEGMENTATION masks (what we map to Rib_L/R): RibSeg v2 = "
+                 "Google Drive (link in HINTLab/RibSeg README); RibSeg v1 = Zenodo "
+                 "5336592. Masks are NIfTI (512,512,N) rib labels, NOT RibFrac's "
+                 "fracture labels. GDrive → use `gdown`.",
     },
     "ctpelvic1k": {
         "method": "zenodo", "record": "4588403", "verified": True,
