@@ -12,13 +12,13 @@ def write_dataset_json(out_dir, num_training: int, present_union) -> dict:
         "overwrite_image_reader_writer": "SimpleITKIO",
     }
     os.makedirs(out_dir, exist_ok=True)
-    with open(os.path.join(out_dir, "dataset.json"), "w") as f:
+    with open(os.path.join(out_dir, "dataset.json"), "w", encoding="utf-8") as f:
         json.dump(d, f, indent=2)
     return d
 
 def write_present_sidecar(out_dir, case_id: str, present_labels) -> str:
     os.makedirs(out_dir, exist_ok=True)
     p = os.path.join(out_dir, f"{case_id}.present.json")
-    with open(p, "w") as f:
+    with open(p, "w", encoding="utf-8") as f:
         json.dump({"present_labels": list(present_labels)}, f)
     return p

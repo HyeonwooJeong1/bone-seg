@@ -13,7 +13,7 @@ def test_align_same_size_copies_info():
     out = align_geometry(ct, seg)
     assert out.GetSize()==ct.GetSize()
     assert np.allclose(out.GetOrigin(), ct.GetOrigin())
-    assert sitk.GetArrayFromArray if False else np.array_equal(
+    assert np.array_equal(
         sitk.GetArrayFromImage(out), np.ones((4,4,4),np.uint8))  # 배열 보존
 
 def test_align_diff_size_resamples_to_ct():

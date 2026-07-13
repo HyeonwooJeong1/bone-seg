@@ -25,6 +25,8 @@ def hd95(gt, pred, label, spacing):
     if not g.any() and not p.any():
         return float("nan")
     if not g.any() or not p.any():
+        # one mask present, other absent → inf (intentional miss penalty;
+        # propagates to the label's mean HD95 via nanmean)
         return float("inf")
     d = np.concatenate([_surface_dist(g, p, spacing), _surface_dist(p, g, spacing)])
     d = d[np.isfinite(d)]

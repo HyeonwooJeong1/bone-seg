@@ -1,4 +1,4 @@
-﻿from ai_bone import taxonomy_v1 as tx
+from ai_bone import taxonomy_v1 as tx
 
 def test_counts():
     assert tx.NUM_CLASSES == 54          # bg + 53 fg
