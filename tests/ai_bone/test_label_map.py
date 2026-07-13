@@ -30,3 +30,19 @@ def test_validate_rejects_unknown_label(tmp_path):
         "grouped":{}, "present_labels":["NotABone"]})
     with pytest.raises(ValueError):
         load_label_map(p)
+
+from ai_bone.datasets import registry
+
+def test_all_registered_label_maps_load():
+    assert {"totalseg","verse","ctspine1k","ribseg","ctpelvic1k",
+            "spinemets","mug500","cads"} <= set(registry.DATASETS)
+    for spec in registry.DATASETS.values():
+        lm = load_label_map(spec.label_map_path)   # validate() 내부 호출
+        assert lm.present_labels
+
+def test_ribseg_covers_24_ribs():
+    lm = load_label_map(registry.DATASETS["ribseg"].label_map_path)
+    names = set(lm.value_to_name.values())
+    for s in ("L","R"):
+        for i in range(1,13):
+            assert f"Rib_{s}_{i}" in names

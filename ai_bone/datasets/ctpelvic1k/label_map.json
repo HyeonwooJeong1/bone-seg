@@ -1,0 +1,18 @@
+{
+  "dataset": "ctpelvic1k",
+  "source_format": "nifti_seg",
+  "provenance_license": "public",
+  "map": {
+    "1": "Sacrum",
+    "3": "Hip_L",
+    "4": "Hip_R"
+  },
+  "grouped": {
+    "lumbar": {
+      "source_value": 2,
+      "covers": ["L1", "L2", "L3", "L4", "L5"]
+    }
+  },
+  "present_labels": ["Sacrum", "Hip_L", "Hip_R"],
+  "notes": "원본 4class: 1=천골,2=요추(덩어리),3/4=좌우 관골. 좌우는 verify로 검증."
+}

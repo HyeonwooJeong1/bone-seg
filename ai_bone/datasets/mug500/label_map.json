@@ -1,0 +1,11 @@
+{
+  "dataset": "mug500",
+  "source_format": "nifti_seg",
+  "provenance_license": "public",
+  "map": {
+    "1": "Skull"
+  },
+  "grouped": {},
+  "present_labels": ["Skull"],
+  "notes": "두개골 단일 라벨. 실제 값은 다운로드 후 확정."
+}
