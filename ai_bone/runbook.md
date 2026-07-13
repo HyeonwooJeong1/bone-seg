@@ -351,6 +351,8 @@ nnUNetv2_preprocess \
   -np 16
 ```
 
+> **CPU 예절(공유 서버):** 이 박스는 ~124코어지만 **혼자 쓰는 게 아니므로** build/전처리 병렬은 넉넉히 남깁니다. `build_raw --workers`(기본 16)와 `nnUNetv2_preprocess -np 16` 정도를 유지하고, 급할 때만 24까지. 전 코어 독점 금지.
+
 전처리 완료 후 SSD로 복사:
 
 ```bash
@@ -969,7 +971,7 @@ H100은 nnU-Net 기본 patch/batch에 여유가 남습니다. 시간이 되면:
    ```bash
    nnUNetv2_plan_experiment -d 500 510 -overwrite_target_spacing 0.6 0.6 0.6 \
      -gpu_memory_target 70 -overwrite_plans_name nnUNetPlans_iso06_big
-   nnUNetv2_preprocess -d 500 510 -plans_name nnUNetPlans_iso06_big -c 3d_fullres -np 32
+   nnUNetv2_preprocess -d 500 510 -plans_name nnUNetPlans_iso06_big -c 3d_fullres -np 16
    ```
    이후 스크립트/큐의 `-p`를 `nnUNetPlans_iso06_big`으로 바꿔 사용.
 2. **`nnUNet_n_proc_DA` 상향**(기본 24) — GPU가 augmentation 대기로 굶주리면 32~48까지. 124코어라 2 job이면 여유.

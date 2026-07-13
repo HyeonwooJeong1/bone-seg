@@ -41,3 +41,19 @@ def test_build_from_pairs_writes_good_skips_bad(tmp_path):
     dj = json.loads((out / "dataset.json").read_text(encoding="utf-8"))
     assert dj["numTraining"] == 1
     assert dj["labels"]["ignore"] == 255
+
+def test_workers_gt1_with_injected_io_stays_sequential(tmp_path):
+    # Injected reader/writer can't be pickled to a Pool, so workers>1 must fall
+    # back to the sequential path (no crash, same result).
+    good_ct, good_seg = _img(True)
+    store = {"c": good_ct, "s": good_seg}
+    written = []
+    lm = LabelMap("t", "nifti_seg", "public", {1: "C1"}, {}, ["C1"])
+    res = build_from_pairs(
+        [("c", "s", "good")], lm, str(tmp_path / "D"),
+        reader=lambda p: store[p],
+        writer=lambda img, p: written.append(os.path.basename(p)),
+        logf=lambda *a: None, workers=4,
+    )
+    assert res["written"] == 1
+    assert "good_0000.nii.gz" in written
