@@ -921,6 +921,17 @@ tail -f /data1/bone/logs/stage1_gpu0.log
 - baseline 5개: `Dataset510` fold 0–4
 - MERIT: 파티션(520/521…) × fold 0–4  (split 결과에 따라 K개)
 
+### ★ GPU는 Docker로 실행 (서버 정책)
+GPU 학습/추론은 컨테이너로 돌립니다. 이미지 `bone-nnunet:2.8.1`가 서버에 이미 있고 `docker run --gpus`가 sudo 없이 동작합니다(nvidia-container-toolkit). base ES trainer는 이미지에 내장, 우리 커스텀 trainer 2개는 실행 시 nnunetv2 trainer 폴더로 **bind-mount**됩니다.
+
+- **단일 잡 = `ai_bone/train/docker_train.sh <GPU> <DID> <CFG> <FOLD> <TRAINER> [PRETRAINED]`**
+  ```bash
+  bash ai_bone/train/docker_train.sh 2 510 3d_fullres 0 nnUNetTrainerNoMirroring_ES_PL \
+    /data1/bone/nnunet/results/Dataset500_AxialPretrain/nnUNetTrainerNoMirroring_ES_PL__nnUNetPlans_iso06__3d_fullres/fold_all/checkpoint_final.pth
+  ```
+- 여러 잡을 GPU에 나눠 돌릴 땐 각 GPU에 `docker_train.sh`를 순차로 넣는 래퍼를 쓰거나, `run_queue.sh`의 `nnUNetv2_train` 호출을 `docker_train.sh`로 바꾼 변형을 사용하십시오.
+- 아래 Phase 명령들의 `nnUNetv2_train ...`은 **conda 직접 실행 형태**이며(참고용), 실제로는 위 `docker_train.sh`로 감싸 실행합니다. 전처리·다운로드는 GPU가 없어 Docker 불필요.
+
 ### Phase 1 — 사전학습: 한 모델에 2 GPU (DDP)
 단일 모델이라 큐로 나눌 수 없으니 **nnU-Net DDP로 2장을 한 모델에** 투입 → 두 GPU 모두 가동.
 ```bash
