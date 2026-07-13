@@ -18,6 +18,10 @@ def test_ribfrac_ct_is_auto_multirecord():
     assert src["method"] == "zenodo" and src["verified"] is True
     assert src["records"] == ["3893508", "3893498", "3893496"]
 
+def test_cads_is_huggingface():
+    src = SOURCES["cads"]
+    assert src["method"] == "huggingface" and src.get("repo_id") == "mrmrx/CADS-dataset"
+
 def test_get_source_unknown_raises():
     import pytest
     with pytest.raises(KeyError):

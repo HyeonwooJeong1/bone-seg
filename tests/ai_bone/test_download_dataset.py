@@ -23,8 +23,9 @@ def test_unverified_without_force_skips(tmp_path):
     assert any("UNVERIFIED" in m for m in logs)
 
 def test_manual_source_prints_instructions(tmp_path):
+    # 'spinemets' is a manual source → prints instructions, no download/network.
     logs = []
-    out = download_dataset("cads", str(tmp_path), force=True, logf=logs.append)
+    out = download_dataset("spinemets", str(tmp_path), force=True, logf=logs.append)
     assert out == []
     assert any("manual download" in m for m in logs)
 

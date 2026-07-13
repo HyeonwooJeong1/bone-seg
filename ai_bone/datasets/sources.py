@@ -16,10 +16,15 @@ fetch an unverified source unless `--force` is given, and always prints the
 SOURCES = {
     # Pretrain — HuggingFace dataset (needs `huggingface_hub`), large.
     "cads": {
-        "method": "manual", "verified": False,
+        "method": "huggingface", "repo_id": "mrmrx/CADS-dataset", "verified": True,
         "landing_url": "https://huggingface.co/datasets/mrmrx/CADS-dataset",
-        "notes": "HuggingFace hub. Axial-bone subset only needed for pretrain; "
-                 "consider subsampling (~3-5k scans) — full 22k not required.",
+        # allow_patterns subsamples the snapshot. None = download EVERYTHING (very
+        # large — 22k scans). For pretrain a subset is enough; set a pattern here
+        # or pass --allow on the CLI (e.g. a shard/subject-range glob).
+        "allow_patterns": None,
+        "notes": "HuggingFace (needs `huggingface_hub`). ⚠ full set is very large "
+                 "(22k scans) — pretrain only needs ~3-5k, so subsample via "
+                 "allow_patterns / --allow before pulling everything.",
     },
     # Expert GT (fine-tune)
     "totalseg": {
@@ -86,7 +91,7 @@ SOURCES = {
     },
 }
 
-_ALLOWED_METHODS = {"zenodo", "manual"}
+_ALLOWED_METHODS = {"zenodo", "huggingface", "manual"}
 
 
 def get_source(name):
