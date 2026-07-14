@@ -5,3 +5,5 @@ huggingface_hub
 hf_transfer
 scikit-image
 matplotlib
+gdown
+osfclient

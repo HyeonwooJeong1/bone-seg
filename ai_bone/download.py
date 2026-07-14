@@ -38,6 +38,26 @@ def download_dataset(name, dest_root, session=None, force=False, logf=print,
             max_workers=max_workers or 4,   # fewer concurrent HEADs → fewer 429s
         )
         return [str(path)]
+    if src["method"] == "gdrive":
+        import os
+        import gdown                                   # server dep
+        dest = os.path.join(dest_root, name)
+        os.makedirs(dest, exist_ok=True)
+        out = []
+        for fid in (src.get("file_ids") or [src["file_id"]]):
+            logf(f"[{name}] gdrive file {fid} → {dest}")
+            out.append(str(gdown.download(id=fid, output=dest + os.sep, quiet=False)))
+        return out
+    if src["method"] == "osf":
+        import os, subprocess
+        out = []
+        for proj in src["osf_projects"]:
+            d = os.path.join(dest_root, name, proj)
+            os.makedirs(d, exist_ok=True)
+            logf(f"[{name}] osf clone {proj} → {d}")
+            subprocess.run(["osf", "-p", proj, "clone", d], check=True)
+            out.append(d)
+        return out
     if src["method"] == "zenodo":
         import os
         if session is None:

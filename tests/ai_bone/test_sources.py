@@ -22,6 +22,12 @@ def test_cads_is_huggingface():
     src = SOURCES["cads"]
     assert src["method"] == "huggingface" and src.get("repo_id") == "mrmrx/CADS-dataset"
 
+def test_ribseg_gdrive_and_verse_osf():
+    rs = SOURCES["ribseg"]
+    assert rs["method"] == "gdrive" and rs["file_id"] == "1ZZGGrhd0y1fLyOZGo_Y-wlVUP4lkHVgm"
+    vs = SOURCES["verse"]
+    assert vs["method"] == "osf" and vs["osf_projects"] == ["nqjyw", "t98fz"]
+
 def test_get_source_unknown_raises():
     import pytest
     with pytest.raises(KeyError):

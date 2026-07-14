@@ -16,9 +16,9 @@ class _Sess:
 _MANIFEST = {"files": [{"key": "a.bin", "links": {"self": "https://x/a.bin"}, "size": 3}]}
 
 def test_unverified_without_force_skips(tmp_path):
-    # 'verse' is an unverified source → must short-circuit BEFORE any network/session.
+    # 'mug500' is an unverified source → must short-circuit BEFORE any network/tool.
     logs = []
-    out = download_dataset("verse", str(tmp_path), force=False, logf=logs.append)
+    out = download_dataset("mug500", str(tmp_path), force=False, logf=logs.append)
     assert out == []
     assert any("UNVERIFIED" in m for m in logs)
 

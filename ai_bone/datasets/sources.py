@@ -35,14 +35,10 @@ SOURCES = {
                  "at build time via the verify_dataset overlap gate.",
     },
     "verse": {
-        "method": "manual", "verified": False,
+        "method": "osf", "osf_projects": ["nqjyw", "t98fz"], "verified": True,
         "landing_url": "https://github.com/anjany/verse",
-        "urls": ["https://osf.io/nqjyw/", "https://osf.io/t98fz/"],
-        "notes": "3D CT+masks are on OSF, NOT Zenodo: VerSe'19 = osf.io/nqjyw, "
-                 "VerSe'20 = osf.io/t98fz (rawdata=CT .nii.gz, derivatives=seg "
-                 "masks + centroid .json). Zenodo 3759104 is only the challenge "
-                 "doc and 8115942 is 2D projections — neither is the volume data. "
-                 "Download via `osfclient` or the browser.",
+        "notes": "VerSe'19 = OSF nqjyw, VerSe'20 = OSF t98fz (rawdata=CT .nii.gz, "
+                 "derivatives=seg masks + centroid .json). Public → osfclient.",
     },
     "ctspine1k": {
         "method": "manual", "verified": False,
@@ -62,16 +58,12 @@ SOURCES = {
                  "segmentation masks come from RibSeg (dataset 'ribseg').",
     },
     "ribseg": {
-        "method": "manual", "verified": False,
+        "method": "gdrive", "file_id": "1ZZGGrhd0y1fLyOZGo_Y-wlVUP4lkHVgm",
+        "verified": True,
         "landing_url": "https://github.com/HINTLab/RibSeg",
-        "ribfrac_records": ["3893508", "3893498", "3893496"],
-        "notes": "Two-part source. (1) CT images = RibFrac on Zenodo — train "
-                 "3893508 (part1, 300) + 3893498 (part2, 120) + 3893496 (val, 80); "
-                 "these ARE zenodo-automatable if you add them as separate entries. "
-                 "(2) RIB SEGMENTATION masks (what we map to Rib_L/R): RibSeg v2 = "
-                 "Google Drive (link in HINTLab/RibSeg README); RibSeg v1 = Zenodo "
-                 "5336592. Masks are NIfTI (512,512,N) rib labels, NOT RibFrac's "
-                 "fracture labels. GDrive → use `gdown`.",
+        "notes": "RibSeg v2 RIB SEGMENTATION masks (NIfTI 512x512xN rib labels) via "
+                 "Google Drive. CT images come from RibFrac (dataset 'ribfrac_ct', "
+                 "already auto-downloaded). Pair the two for build.",
     },
     "ctpelvic1k": {
         "method": "zenodo", "record": "4588403", "verified": True,
@@ -87,11 +79,13 @@ SOURCES = {
     "mug500": {
         "method": "manual", "verified": False,
         "landing_url": "https://figshare.com/articles/dataset/MUG500_/9616319",
-        "notes": "Figshare — 500 skull segmentations.",
+        "notes": "SKIP recommended: STL surface meshes (not voxel masks), ~210GB, "
+                 "only contributes the single 'Skull' label which TotalSeg already "
+                 "annotates. Not worth voxelizing for v1. Figshare art. 9616319.",
     },
 }
 
-_ALLOWED_METHODS = {"zenodo", "huggingface", "manual"}
+_ALLOWED_METHODS = {"zenodo", "huggingface", "gdrive", "osf", "manual"}
 
 
 def get_source(name):
