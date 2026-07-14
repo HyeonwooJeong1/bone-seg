@@ -53,29 +53,49 @@ def download_dataset(name, dest_root, session=None, force=False, logf=print,
             for entry in parse_zenodo_manifest(record_json):
                 dest = os.path.join(dest_root, name, entry["name"])
                 logf(f"[{name}] record {rec}: downloading {entry['name']} ...")
-                out.append(str(download_file(entry["url"], dest, session=session)))
+                out.append(str(download_file(entry["url"], dest, session=session,
+                                             expected_size=entry.get("size"))))
         return out
     logf(f"[{name}] unknown method {src['method']!r}")
     return []
 
 
-def download_file(url, dest, resume=True, session=None, chunk=1 << 20):
+def download_file(url, dest, resume=True, session=None, chunk=1 << 20,
+                  expected_size=None, max_retries=6):
+    """Resumable download that RETRIES on dropped connections (large Zenodo zips
+    routinely break mid-stream). Resumes from the partial file via HTTP Range;
+    if `expected_size` is known, verifies completeness and skips already-complete
+    files (avoids a 416 error when re-run)."""
+    import time
     dest = Path(dest); dest.parent.mkdir(parents=True, exist_ok=True)
     if session is None:
         import requests
         session = requests.Session()
-    pos = dest.stat().st_size if (resume and dest.exists()) else 0
-    headers = {"Range": f"bytes={pos}-"} if pos else {}
-    with session.get(url, stream=True, headers=headers, timeout=60) as r:
-        r.raise_for_status()
-        # Append only when the server honored the Range request (206 Partial).
-        # If it ignored Range and returned the full body (200), truncate to
-        # avoid doubling the already-downloaded prefix.
-        mode = "ab" if (pos and getattr(r, "status_code", 206) == 206) else "wb"
-        with open(dest, mode) as f:
-            for c in r.iter_content(chunk):
-                if c: f.write(c)
-    return dest
+    last_err = None
+    for attempt in range(max_retries):
+        pos = dest.stat().st_size if (resume and dest.exists()) else 0
+        if expected_size is not None and pos >= expected_size:
+            return dest                       # already complete
+        headers = {"Range": f"bytes={pos}-"} if pos else {}
+        try:
+            with session.get(url, stream=True, headers=headers, timeout=60) as r:
+                if getattr(r, "status_code", 200) == 416:
+                    return dest               # range not satisfiable → complete
+                r.raise_for_status()
+                # Append only when the server honored Range (206); a 200 means it
+                # ignored Range and sent the full body, so truncate to avoid dup.
+                mode = "ab" if (pos and getattr(r, "status_code", 206) == 206) else "wb"
+                with open(dest, mode) as f:
+                    for c in r.iter_content(chunk):
+                        if c: f.write(c)
+            if expected_size is None or dest.stat().st_size >= expected_size:
+                return dest                   # done (or size unknown → assume ok)
+            last_err = f"incomplete {dest.stat().st_size}/{expected_size}"
+        except Exception as e:                # dropped connection etc. → resume-retry
+            last_err = e
+        if attempt < max_retries - 1:
+            time.sleep(min(30, 2 ** attempt))
+    raise RuntimeError(f"download failed after {max_retries} tries: {url} ({last_err})")
 
 
 def main():
