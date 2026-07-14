@@ -8,6 +8,7 @@
 
 ## 목차
 
+0. [Docker 파이프라인 (모든 실행)](#0-docker-파이프라인-모든-실행)
 1. [환경 준비](#1-환경-준비)
 2. [데이터 다운로드](#2-데이터-다운로드)
 3. [통합 빌드 (nnUNet_raw 조립)](#3-통합-빌드-nnunet_raw-조립)
@@ -17,6 +18,63 @@
 7. [Stage 3: MERIT (Conflict-aware 분할 + 병합)](#7-stage-3-merit-conflict-aware-분할--병합)
 8. [평가 및 추론](#8-평가-및-추론)
 9. [GPU 나눠쓰기 규약](#9-gpu-나눠쓰기-규약)
+
+---
+
+## 0. Docker 파이프라인 (모든 실행)
+
+**서버 정책: 모든 실행을 컨테이너 안에서.** 데이터준비·다운로드·빌드·전처리·학습·평가가
+**단일 이미지 `bone-pipeline:latest`** 안에서 돕니다(우리 `ai_bone` 코드 + nnU-Net + 커스텀 trainer +
+데이터준비/평가 의존성 baked-in). 아래 §1~§8의 파이썬/nnU-Net 명령은 **컨테이너로 감싸 실행**합니다.
+
+### 0-A. 이미지 빌드 (코드 바뀔 때마다 재빌드)
+```bash
+# 코드+docker/를 빌드 컨텍스트로 (데이터 제외)
+mkdir -p /data1/bone/build && cd /data1/bone/build   # ai_bone/ + docker/ 를 여기에 둠
+docker build -t bone-pipeline:latest -f docker/Dockerfile .
+```
+> `docker/Dockerfile` = `FROM bone-nnunet:2.8.1` + pip(requests·huggingface_hub·scikit-image·
+> matplotlib) + `COPY ai_bone` + 커스텀 trainer를 nnunetv2에 복사. **코드 수정 시 재빌드 필수**
+> (이미지에 코드가 구워지므로).
+
+### 0-B. CPU 작업 = `run_in_docker.sh` (데이터준비·빌드·평가·분석)
+```bash
+bash ai_bone/run_in_docker.sh python -m ai_bone.datasets.combine --root ... --out ...
+bash ai_bone/run_in_docker.sh python -m ai_bone.build_raw --pairs p.json --dataset totalseg --out ... --workers 16
+```
+> 내부적으로 `docker run --rm -v /data1:/data1 -w /data1 bone-pipeline python ...`.
+> **workdir는 `/data1`**(≠ `/data1/bone`) — 그래야 host의 `/data1/bone/ai_bone`가 이미지 코드를
+> 가리지 않음(PYTHONPATH=`/opt/ai_bone`).
+> 오래 걸리는 작업은 `docker run -d --name job ...` 후 `docker logs -f job`.
+
+### 0-C. GPU 학습 = `docker_train.sh`
+```bash
+bash ai_bone/train/docker_train.sh <GPU> <DID> <CFG> <FOLD> <TRAINER> [PRETRAINED]
+```
+> `docker run --rm --gpus all -e CUDA_VISIBLE_DEVICES=<GPU> -v /data1:/data1 bone-pipeline nnUNetv2_train ...`.
+> trainer는 이미지에 구워져 있어 바인드마운트 불필요.
+
+### 0-D. 데이터 준비 워크플로우 (컨테이너)
+```bash
+# 1) 압축 해제 (host에 unzip 없으면 컨테이너 python으로)
+docker run -d --name extract -v /data1:/data1 bone-pipeline:latest python - <<'PY'
+import zipfile,tarfile,glob,os
+raw="/data1/bone/raw"
+zipfile.ZipFile(raw+"/totalseg/Totalsegmentator_dataset_v201.zip").extractall(raw+"/totalseg_ext")
+for t in glob.glob(raw+"/ctpelvic1k/*.tar.gz"): tarfile.open(t).extractall(raw+"/ctpelvic1k_ext")
+PY
+# 2) TotalSeg 구조별 바이너리 → 합치기 (unified id seg)
+bash ai_bone/run_in_docker.sh python -m ai_bone.datasets.combine \
+  --root /data1/bone/raw/totalseg_ext --out /data1/bone/raw/totalseg_combined
+# 3) pairs 매니페스트
+bash ai_bone/run_in_docker.sh python -m ai_bone.datasets.make_pairs --dataset totalseg \
+  --root /data1/bone/raw/totalseg_ext --combined /data1/bone/raw/totalseg_combined --out /data1/bone/pairs_totalseg.json
+bash ai_bone/run_in_docker.sh python -m ai_bone.datasets.make_pairs --dataset ctpelvic1k \
+  --ct-root /data1/bone/raw/ctpelvic1k_ext --mask-root /data1/bone/raw/ctpelvic1k_ext --out /data1/bone/pairs_ctpelvic1k.json
+# 4) 통합 빌드 (verify 게이트, CPU 병렬 16)
+bash ai_bone/run_in_docker.sh python -m ai_bone.build_raw --pairs /data1/bone/pairs_totalseg.json \
+  --dataset totalseg --out /data1/bone/nnunet/raw/Dataset510_AxialFT --workers 16
+```
 
 ---
 

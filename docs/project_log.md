@@ -53,6 +53,28 @@
 
 ---
 
+## Phase F — 논문 방법·평가 코드 (로컬 GPU-free, 전부 테스트)
+- **평가지표**(근거 `docs/metrics_justification.md`: Metrics Reloaded + VerSe/RibSeg/TotalSeg/panoptica):
+  `eval/metrics.py`(DSC·**NSD@τ**·HD95·ASSD·**clDice**), `eval/instance_metrics.py`(**PQ=RQ×SQ**·
+  identification rate·centroid localization·confusion·L/R swap·rib Label-Accuracy),
+  `eval/bone_groups.py`(부위·난이도층·LR·이행부), `eval/evaluate.py`(per-class+부위/난이도 요약+
+  instance 리포트, **CLI** `python -m ai_bone.eval.evaluate --gt --pred`).
+- **MERIT conflict 분석/시각화** `merit/conflict_analysis.py`: 코사인행렬 C·PCA 임베딩·분할·
+  **ARI/NMI(분할 vs 해부)**·heatmap/scatter, CLI. (RQ5 산출물)
+- **merge-readiness 진단** `merit/merge_diagnostics.py`: weight displacement(오프라인)·LMC loss
+  barrier·perturbation robustness (eval_fn 주입식, 서버 nnU-Net forward는 `make_nnunet_eval_fn`).
+- **estimate_conflict.py 실제 구현**: nnU-Net trainer로 θ⁰ 로드→데이터셋별 calibration 패치
+  forward/backward→디코더/seg-head grad→JL 랜덤투영→npz(서버 GPU 실행).
+- 설계 근거: `docs/experiment_design.md`(RQ·baseline M0–M7·지표·복잡뼈 층화·통계).
+
+## Phase G — Docker 전환 + 데이터 준비 (진행)
+- **전체 파이프라인 컨테이너화**: `docker/Dockerfile`(bone-nnunet:2.8.1 + 우리 의존성/코드/trainer)
+  → **`bone-pipeline:latest`** 이미지(서버 빌드 완료). `run_in_docker.sh`(CPU 작업), `docker_train.sh`(GPU).
+  runbook §0에 워크플로우 정리.
+- **데이터 구조 파악·ETL 코드**: `datasets/combine.py`(TotalSeg/CADS 구조별 바이너리→unified id seg),
+  `datasets/make_pairs.py`([ct,seg,id] 매니페스트), totalseg label_map=identity.
+- **컨테이너에서 검증**: CTPelvic1K make_pairs(103쌍) + build_raw 실행 중(Dataset511).
+
 ## 현재 상태 (2026-07-14)
 - **다운로드 진행 중**: totalseg/ribfrac_ct resume 재개(연결 끊김 → 수정 후 이어받는 중), ctpelvic1k 사실상 완료,
   CADS subset 진행(HF 429 백오프로 느림). `dl_status.sh`로 확인.
@@ -70,5 +92,7 @@
 - 문헌 gap: `docs/related_work_gap.md`
 - 논문 포지셔닝(MERIT 정독·차별점·Intro): `docs/paper_positioning.md`
 - 실험 설계: `docs/experiment_design.md`
+- 평가지표 근거: `docs/metrics_justification.md`
+- Docker 워크플로우: `ai_bone/runbook.md` §0
 - 서버 실행 런북: `ai_bone/runbook.md`
 - SDD 태스크 원장: `.superpowers/sdd/progress.md`

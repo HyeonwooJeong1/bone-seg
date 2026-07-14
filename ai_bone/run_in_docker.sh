@@ -13,5 +13,7 @@ docker run --rm \
   -e nnUNet_preprocessed=/data1/bone/nnunet/preprocessed \
   -e nnUNet_results=/data1/bone/nnunet/results \
   -e nnUNet_compile=f \
-  -v /data1:/data1 -w /data1/bone \
+  -v /data1:/data1 -w /data1 \
   "$IMAGE" "$@"
+# NOTE: workdir is /data1 (NOT /data1/bone) so the host copy at /data1/bone/ai_bone
+# does not shadow the image's baked-in code (/opt/ai_bone on PYTHONPATH).
