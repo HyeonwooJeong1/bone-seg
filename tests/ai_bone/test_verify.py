@@ -18,3 +18,12 @@ def test_misaligned_low_overlap_fails():
     seg=np.zeros((6,6,6)); seg[0:2,0:2,0:2]=5
     hu=np.zeros((6,6,6)); hu[4:6,4:6,4:6]=300   # 라벨과 뼈가 딴 곳
     ct,sg=_pair(seg,hu); assert not is_pass(verify_case(ct,sg))
+
+def test_overlap_thr_configurable_for_whole_bone_masks():
+    # whole-bone mask: only ~40% of labeled voxels are high-HU (marrow is low)
+    seg=np.zeros((10,10,10)); seg[2:7,2:7,2:7]=5           # 125 vox
+    hu=np.zeros((10,10,10)); hu[2:7,2:4,2:7]=300           # ~50 vox high-HU
+    rep=verify_case(_pair(seg,hu)[0], _pair(seg,hu)[1])
+    assert 0.3 < rep["overlap_ratio"] < 0.5
+    assert not is_pass(rep)                      # default 0.5 → rejected
+    assert is_pass(rep, overlap_thr=0.25)        # relaxed → accepted

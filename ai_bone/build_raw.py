@@ -33,14 +33,14 @@ def _process_one_case(task):
     from ai_bone.harmonize import harmonize_case
     from ai_bone.verify_dataset import verify_case, is_pass
     from ai_bone.nifti_io import read_sitk
-    ct_path, seg_path, cid, lm, images_dir, labels_dir, spacing, hu_thr = task
+    ct_path, seg_path, cid, lm, images_dir, labels_dir, spacing, hu_thr, overlap_thr = task
     try:
         out_ct, out_seg = harmonize_case(read_sitk(ct_path), read_sitk(seg_path),
                                          lm, spacing_mm=spacing)
     except Exception as e:                           # unreadable / geometry failure
         return (cid, False, {"error": str(e)})
     rep = verify_case(out_ct, out_seg, hu_thr=hu_thr)
-    if not is_pass(rep):
+    if not is_pass(rep, overlap_thr):
         return (cid, False, rep)
     sitk.WriteImage(out_ct, _os.path.join(images_dir, f"{cid}_0000.nii.gz"))
     sitk.WriteImage(sitk.Cast(out_seg, sitk.sitkUInt8), _os.path.join(labels_dir, f"{cid}.nii.gz"))
@@ -49,7 +49,8 @@ def _process_one_case(task):
 
 
 def build_from_pairs(pairs, lm, raw_dir, spacing=0.6, hu_thr=200,
-                     reader=None, writer=None, logf=print, workers=1) -> dict:
+                     reader=None, writer=None, logf=print, workers=1,
+                     overlap_thr=0.5) -> dict:
     """End-to-end build of one nnU-Net raw dataset from explicit (ct, seg, id) pairs.
 
     For each pair: read CT+seg → `harmonize_case` (remap+align+isotropic) →
@@ -77,7 +78,7 @@ def build_from_pairs(pairs, lm, raw_dir, spacing=0.6, hu_thr=200,
 
     if workers and workers > 1 and reader is None and writer is None:
         from multiprocessing import Pool
-        tasks = [(cp, sp, cid, lm, images_dir, labels_dir, spacing, hu_thr)
+        tasks = [(cp, sp, cid, lm, images_dir, labels_dir, spacing, hu_thr, overlap_thr)
                  for cp, sp, cid in pairs]
         with Pool(workers) as pool:
             for cid, ok, payload in pool.imap_unordered(_process_one_case, tasks):
@@ -95,7 +96,7 @@ def build_from_pairs(pairs, lm, raw_dir, spacing=0.6, hu_thr=200,
             except Exception as e:                   # unreadable / geometry failure
                 logf(f"[{cid}] ERROR harmonize: {e}"); skipped.append((cid, {"error": str(e)})); continue
             rep = verify_case(out_ct, out_seg, hu_thr=hu_thr)
-            if not is_pass(rep):
+            if not is_pass(rep, overlap_thr):
                 logf(f"[{cid}] SKIP (verify): empty={rep['empty']} size_match={rep['size_match']} "
                      f"overlap={rep['overlap_ratio']:.2f}")
                 skipped.append((cid, rep)); continue
@@ -127,6 +128,9 @@ def main():
     ap.add_argument("--out", required=True, help="output nnUNet_raw dataset dir")
     ap.add_argument("--spacing", type=float, default=0.6)
     ap.add_argument("--hu-thr", type=int, default=200)
+    ap.add_argument("--overlap-thr", type=float, default=0.5,
+                    help="verify overlap gate (lower for whole-bone/marrow masks, "
+                         "e.g. 0.25 for TotalSeg; ~0 catches gross misalignment)")
     # Shared server: default to a modest core count and leave the rest for others.
     # The box has ~124 cores; do NOT crank this near that. 16 is a polite default.
     ap.add_argument("--workers", type=int, default=16,
@@ -135,7 +139,8 @@ def main():
     args = ap.parse_args()
     lm = load_label_map(DATASETS[args.dataset].label_map_path)
     res = build_from_pairs(_load_pairs(args.pairs), lm, args.out,
-                           spacing=args.spacing, hu_thr=args.hu_thr, workers=args.workers)
+                           spacing=args.spacing, hu_thr=args.hu_thr, workers=args.workers,
+                           overlap_thr=args.overlap_thr)
     print(f"written={res['written']} skipped={len(res['skipped'])}")
 
 
