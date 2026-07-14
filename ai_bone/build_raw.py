@@ -32,9 +32,10 @@ def _process_one_case(task):
     import SimpleITK as sitk
     from ai_bone.harmonize import harmonize_case
     from ai_bone.verify_dataset import verify_case, is_pass
+    from ai_bone.nifti_io import read_sitk
     ct_path, seg_path, cid, lm, images_dir, labels_dir, spacing, hu_thr = task
     try:
-        out_ct, out_seg = harmonize_case(sitk.ReadImage(ct_path), sitk.ReadImage(seg_path),
+        out_ct, out_seg = harmonize_case(read_sitk(ct_path), read_sitk(seg_path),
                                          lm, spacing_mm=spacing)
     except Exception as e:                           # unreadable / geometry failure
         return (cid, False, {"error": str(e)})
@@ -85,7 +86,8 @@ def build_from_pairs(pairs, lm, raw_dir, spacing=0.6, hu_thr=200,
                 else:
                     skipped.append((cid, payload)); logf(f"[{cid}] SKIP: {payload}")
     else:
-        read = reader or (lambda p: sitk.ReadImage(p))
+        from ai_bone.nifti_io import read_sitk
+        read = reader or read_sitk
         write = writer or (lambda img, p: sitk.WriteImage(img, p))
         for ct_path, seg_path, cid in pairs:
             try:

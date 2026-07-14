@@ -46,7 +46,8 @@ def combine_case(seg_dir, name_to_unified=TS_NAME_TO_UNIFIED, reader=None):
     Geometry taken from the first present mask. Returns None if no mapped mask found."""
     import os
     import SimpleITK as sitk
-    read = reader or (lambda p: sitk.ReadImage(p))
+    from ai_bone.nifti_io import read_sitk
+    read = reader or read_sitk
     binaries, ref = {}, None
     for name in name_to_unified:
         p = os.path.join(seg_dir, name + ".nii.gz")
