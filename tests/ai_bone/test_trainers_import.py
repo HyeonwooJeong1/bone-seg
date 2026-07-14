@@ -4,6 +4,7 @@ FILES = [
     "ai_bone/merit/estimate_conflict.py",
     "ai_bone/train/partial_label_trainer.py",
     "ai_bone/train/merit_finetune_trainer.py",
+    "ai_bone/train/marginal_trainer.py",
 ]
 
 def test_parse_server_scripts():
