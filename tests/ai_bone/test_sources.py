@@ -22,6 +22,12 @@ def test_cads_is_huggingface():
     src = SOURCES["cads"]
     assert src["method"] == "huggingface" and src.get("repo_id") == "mrmrx/CADS-dataset"
 
+def test_ctspine1k_is_huggingface_rawdata_only():
+    src = SOURCES["ctspine1k"]
+    assert src["method"] == "huggingface"
+    assert src.get("repo_id") == "alexanderdann/CTSpine1K"
+    assert src.get("allow_patterns") == ["rawdata/**"]  # skip ~1TB Arrow export
+
 def test_ribseg_gdrive_and_verse_osf():
     rs = SOURCES["ribseg"]
     assert rs["method"] == "gdrive" and rs["file_id"] == "1ZZGGrhd0y1fLyOZGo_Y-wlVUP4lkHVgm"

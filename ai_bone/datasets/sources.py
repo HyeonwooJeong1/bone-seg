@@ -41,10 +41,17 @@ SOURCES = {
                  "derivatives=seg masks + centroid .json). Public → osfclient.",
     },
     "ctspine1k": {
-        "method": "manual", "verified": False,
-        "landing_url": "https://github.com/MIRACLE-Center/CTSpine1K",
-        "notes": "Images pulled from public sources (COLONOG, MSD, etc.) via "
-                 "the repo's download scripts + Google Drive label links.",
+        "method": "huggingface", "repo_id": "alexanderdann/CTSpine1K",
+        "verified": True,
+        "landing_url": "https://huggingface.co/datasets/alexanderdann/CTSpine1K",
+        # Pull only the raw NIfTI tree (rawdata/volumes=CT, rawdata/labels=seg,
+        # 1005 cases ~150GB). Skip the repo's Arrow export (~1TB) which the
+        # default snapshot would otherwise fetch.
+        "allow_patterns": ["rawdata/**"],
+        "notes": "CTSpine1K on HuggingFace (public, not gated). 1005 CT + vertebra "
+                 "seg (.nii.gz), 512x512xN. rawdata/volumes = images, "
+                 "rawdata/labels = *_seg.nii.gz. Restrict to rawdata/** to avoid "
+                 "the ~1TB Arrow export.",
     },
     # RibFrac CT images (auto). Confirmed Zenodo records. NOTE: each record also
     # ships ribfrac-*-labels.zip = FRACTURE labels (ignore those); the rib
