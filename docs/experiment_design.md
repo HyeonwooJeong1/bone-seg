@@ -144,4 +144,4 @@
 6. 평가(§3) + 난이도 층화(§4) + 진단(§5) + ablation(§6) + 통계(§7).
 7. 우리 Mako 정성 QC.
 
-> 코드 훅: 평가=`ai_bone/eval/evaluate.py`(현재 DSC/HD95; **NSD·instance-id·혼동행렬·이행부 band 지표 추가 필요**). conflict=`ai_bone/merit/estimate_conflict.py`+`split.py`. 병합=`merit/merge.py`.
+> 코드 훅(구현됨): 평가=`ai_bone/eval/metrics.py`(DSC·NSD@τ·HD95·ASSD) + `instance_metrics.py`(PQ/RQ/SQ·id-rate·localization·confusion·L/R swap) + `bone_groups.py`(부위/난이도/LR/이행부 그룹) + `evaluate.py`(evaluate_dir·region_summary·difficulty_summary·evaluate_instances_dir). 근거=`docs/metrics_justification.md`. conflict=`merit/estimate_conflict.py`+`split.py`. 병합=`merit/merge.py`. (남은 것: clDice·rib Label-Accuracy·이행부 열거오류율 집계는 후속.)
