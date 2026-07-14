@@ -26,7 +26,7 @@ def test_ctspine1k_is_huggingface_rawdata_only():
     src = SOURCES["ctspine1k"]
     assert src["method"] == "huggingface"
     assert src.get("repo_id") == "alexanderdann/CTSpine1K"
-    assert src.get("allow_patterns") == ["rawdata/**"]  # skip ~1TB Arrow export
+    assert src.get("allow_patterns") == ["raw_data/**", "metadata/**"]  # skip Arrow export
 
 def test_ribseg_gdrive_and_verse_osf():
     rs = SOURCES["ribseg"]

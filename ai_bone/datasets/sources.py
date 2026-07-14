@@ -44,14 +44,15 @@ SOURCES = {
         "method": "huggingface", "repo_id": "alexanderdann/CTSpine1K",
         "verified": True,
         "landing_url": "https://huggingface.co/datasets/alexanderdann/CTSpine1K",
-        # Pull only the raw NIfTI tree (rawdata/volumes=CT, rawdata/labels=seg,
-        # 1005 cases ~150GB). Skip the repo's Arrow export (~1TB) which the
-        # default snapshot would otherwise fetch.
-        "allow_patterns": ["rawdata/**"],
+        # Pull only the raw NIfTI tree (raw_data/ = images + labels/*_seg.nii.gz,
+        # 1005 cases ~150GB) + metadata (split file). Skip the repo's Arrow
+        # export which the default snapshot would otherwise fetch.
+        "allow_patterns": ["raw_data/**", "metadata/**"],
         "notes": "CTSpine1K on HuggingFace (public, not gated). 1005 CT + vertebra "
-                 "seg (.nii.gz), 512x512xN. rawdata/volumes = images, "
-                 "rawdata/labels = *_seg.nii.gz. Restrict to rawdata/** to avoid "
-                 "the ~1TB Arrow export.",
+                 "seg (.nii.gz), 512x512xN. Top dir is raw_data/ (underscore): "
+                 "images + labels/<SRC>/*_seg.nii.gz across COLONOG/HNSCC/MSD/COVID. "
+                 "metadata/data_split.txt gives train/val/test. Restrict to "
+                 "raw_data/** + metadata/** to avoid the large Arrow export.",
     },
     # RibFrac CT images (auto). Confirmed Zenodo records. NOTE: each record also
     # ships ribfrac-*-labels.zip = FRACTURE labels (ignore those); the rib
