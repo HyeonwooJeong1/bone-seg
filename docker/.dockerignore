@@ -1,0 +1,6 @@
+ai_bone/data
+ai_bone/nnunet
+**/__pycache__
+*.pyc
+*.zip
+*.tar.gz

@@ -1,0 +1,7 @@
+# Extra deps for the ai_bone pipeline beyond the nnU-Net base image.
+# (SimpleITK, scipy, numpy, nibabel, pydicom, nnunetv2 already in bone-nnunet:2.8.1)
+requests
+huggingface_hub
+hf_transfer
+scikit-image
+matplotlib
