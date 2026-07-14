@@ -36,6 +36,11 @@ TRANSITION_ZONES = [(_id("C7"), _id("T1")), (_id("T12"), _id("L1")),
 
 FLOATING_RIBS = [_id("Rib_L_11"), _id("Rib_L_12"), _id("Rib_R_11"), _id("Rib_R_12")]
 
+# Rib position strata (RibSeg v2: First / Intermediate / Twelfth rib pairs).
+RIB_FIRST = [_id("Rib_L_1"), _id("Rib_R_1")]
+RIB_TWELFTH = [_id("Rib_L_12"), _id("Rib_R_12")]
+RIB_INTERMEDIATE = [_id(f"Rib_{s}_{i}") for s in ("L", "R") for i in range(2, 12)]
+
 # Difficulty strata → label-id lists (experiment_design §4.1).
 DIFFICULTY_STRATA = {
     "thin_floating_ribs": FLOATING_RIBS,

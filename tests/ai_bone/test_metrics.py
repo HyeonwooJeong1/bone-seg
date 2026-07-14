@@ -33,3 +33,16 @@ def test_nsd_absent_semantics():
     empty=np.zeros((6,6,6),int)
     assert np.isnan(nsd(empty,empty,5,(1,1,1)))     # both absent
     assert nsd(a,empty,5,(1,1,1))==0.0              # one absent
+
+from ai_bone.eval.metrics import cldice
+
+def test_cldice_identical_rod_is_one():
+    a=np.zeros((12,12,12),int); a[5,5,2:10]=5       # thin rod (rib-like)
+    assert cldice(a,a,5)==1.0
+
+def test_cldice_disjoint_is_zero_and_absent_nan():
+    a=np.zeros((16,16,16),int); a[3,3,2:8]=5
+    b=np.zeros((16,16,16),int); b[12,12,8:14]=5
+    assert cldice(a,b,5)==0.0
+    empty=np.zeros((16,16,16),int)
+    assert np.isnan(cldice(empty,empty,5))

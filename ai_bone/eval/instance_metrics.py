@@ -78,6 +78,23 @@ def confusion_pairs(gt, pred, label_ids, min_frac=0.01):
     return out
 
 
+def rib_recall(gt, pred, rib_ids):
+    """Per-rib recall = |gt_i ∩ pred_i| / |gt_i|, for GT-present ribs (RibSeg v2)."""
+    out = {}
+    for lid in rib_ids:
+        g = gt == lid
+        n = int(g.sum())
+        if n:
+            out[int(lid)] = float((pred[g] == lid).sum() / n)
+    return out
+
+
+def label_accuracy(recalls, thr=0.7):
+    """RibSeg v2 Label-Accuracy: fraction of ribs with recall > thr."""
+    vals = list(recalls.values())
+    return float(np.mean([v > thr for v in vals])) if vals else float("nan")
+
+
 def lr_swap_rate(gt, pred, lr_pairs):
     """Left/Right swap rate. lr_pairs = [(left_id, right_id), ...]. For each
     GT-present side, a swap = more of its voxels predicted as the OPPOSITE side

@@ -1,7 +1,18 @@
 import numpy as np
 from ai_bone.eval.instance_metrics import (
     instance_scores, localization_error, confusion_pairs, lr_swap_rate,
+    rib_recall, label_accuracy,
 )
+
+def test_rib_recall_and_label_accuracy():
+    gt = np.zeros((10, 10, 10), int)
+    gt[1:4, 1:4, 1:4] = 5      # "rib" 5
+    gt[6:9, 6:9, 6:9] = 6      # "rib" 6
+    pred = gt.copy()
+    pred[gt == 6] = 0          # rib 6 fully missed (recall 0)
+    rr = rib_recall(gt, pred, [5, 6])
+    assert rr[5] == 1.0 and rr[6] == 0.0
+    assert label_accuracy(rr, thr=0.7) == 0.5     # only rib 5 passes recall>0.7
 
 def _two_label_vol():
     # label 5 in block A, label 6 in block B

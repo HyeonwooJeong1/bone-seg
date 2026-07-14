@@ -73,3 +73,20 @@ def assd(gt, pred, label, spacing):
         return float("inf")
     d_g2p, d_p2g = sd
     return float(np.concatenate([d_g2p, d_p2g]).mean())
+
+
+def cldice(gt, pred, label):
+    """Centerline Dice (topology-aware) — suited to thin/elongated bones (ribs).
+    Harmonic mean of topology precision (pred skeleton inside gt) and topology
+    sensitivity (gt skeleton inside pred). both absent → nan; one absent → 0.0."""
+    from skimage.morphology import skeletonize
+    g = gt == label; p = pred == label
+    if not g.any() and not p.any():
+        return float("nan")
+    if not g.any() or not p.any():
+        return 0.0
+    sk_g = skeletonize(g); sk_p = skeletonize(p)
+    ng, npx = int(sk_g.sum()), int(sk_p.sum())
+    tprec = float((sk_p & g).sum() / npx) if npx else 0.0
+    tsens = float((sk_g & p).sum() / ng) if ng else 0.0
+    return float(2 * tprec * tsens / (tprec + tsens)) if (tprec + tsens) > 0 else 0.0
