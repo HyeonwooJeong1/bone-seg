@@ -8,7 +8,8 @@
 #   bash run_in_docker.sh python -m ai_bone.build_raw --pairs p.json --dataset totalseg --out ...
 set -euo pipefail
 IMAGE="${BONE_IMAGE:-bone-pipeline:latest}"
-docker run --rm \
+# Run as the host user so outputs on /data1 are not root-owned.
+docker run --rm --user "$(id -u):$(id -g)" \
   -e nnUNet_raw=/data1/bone/nnunet/raw \
   -e nnUNet_preprocessed=/data1/bone/nnunet/preprocessed \
   -e nnUNet_results=/data1/bone/nnunet/results \
