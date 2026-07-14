@@ -42,6 +42,22 @@ def test_build_from_pairs_writes_good_skips_bad(tmp_path):
     assert dj["numTraining"] == 1
     assert dj["labels"]["ignore"] == 255
 
+def test_ribseg_pairs_matches_by_case_token(tmp_path):
+    from ai_bone.datasets.make_pairs import ribseg_pairs
+    ct_root = tmp_path / "ribfrac_img"; ct_root.mkdir()
+    seg_dir = tmp_path / "seg"; seg_dir.mkdir()
+    # matched pair + a CT with no seg + a seg with no CT → only the pair survives
+    (ct_root / "RibFrac1-image.nii.gz").write_bytes(b"")
+    (ct_root / "RibFrac2-image.nii.gz").write_bytes(b"")          # no seg
+    (seg_dir / "RibFrac1-rib-seg.nii.gz").write_bytes(b"")
+    (seg_dir / "RibFrac9-rib-seg.nii.gz").write_bytes(b"")        # no ct
+    pairs = ribseg_pairs(str(ct_root), str(seg_dir))
+    assert len(pairs) == 1
+    ct, seg, cid = pairs[0]
+    assert cid == "RibFrac1"
+    assert ct.endswith("RibFrac1-image.nii.gz")
+    assert seg.endswith("RibFrac1-rib-seg.nii.gz")
+
 def test_workers_gt1_with_injected_io_stays_sequential(tmp_path):
     # Injected reader/writer can't be pickled to a Pool, so workers>1 must fall
     # back to the sequential path (no crash, same result).
