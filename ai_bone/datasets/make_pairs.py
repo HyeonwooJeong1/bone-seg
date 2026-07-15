@@ -66,6 +66,15 @@ def ctpelvic1k_pairs(ct_root, mask_root):
     return [(ctm[t], sgm[t], t) for t in ctm if t in sgm]
 
 
+def ctspine1k_pairs(vol_root, label_root):
+    """Match CTSpine1K CT (raw_data/volumes/<SRC>/<UID>.nii.gz) ↔ seg
+    (raw_data/labels/<SRC>/<UID>_seg.nii.gz) by the shared <UID> token.
+    Volumes and labels live in disjoint trees, searched recursively."""
+    ct = glob.glob(os.path.join(vol_root, "**", "*.nii.gz"), recursive=True)
+    seg = glob.glob(os.path.join(label_root, "**", "*_seg.nii.gz"), recursive=True)
+    return match_by_token(sorted(ct), sorted(seg), ct_strip="", seg_strip="_seg")
+
+
 def ribseg_pairs(ct_root, seg_dir):
     """Match RibFrac CT (RibFracXXX-image.nii.gz, unzipped from ribfrac_ct) ↔
     RibSeg mask (RibFracXXX-rib-seg.nii.gz) by the shared 'RibFracXXX' token.
@@ -88,7 +97,7 @@ def main():
     import argparse
     ap = argparse.ArgumentParser(description="Build a [ct,seg,id] pairs manifest.")
     ap.add_argument("--dataset", required=True,
-                    choices=["totalseg", "ctpelvic1k", "ribseg", "generic"])
+                    choices=["totalseg", "ctpelvic1k", "ribseg", "ctspine1k", "generic"])
     ap.add_argument("--out", required=True)
     # totalseg
     ap.add_argument("--root", help="extracted dataset root")
@@ -109,6 +118,8 @@ def main():
         pairs = ctpelvic1k_pairs(args.ct_root, args.mask_root)
     elif args.dataset == "ribseg":
         pairs = ribseg_pairs(args.ct_root, args.mask_root)
+    elif args.dataset == "ctspine1k":
+        pairs = ctspine1k_pairs(args.ct_root, args.mask_root)
     else:
         pairs = match_by_token(sorted(glob.glob(args.ct_glob)),
                                sorted(glob.glob(args.seg_glob)),

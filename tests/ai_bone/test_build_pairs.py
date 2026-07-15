@@ -58,6 +58,20 @@ def test_ribseg_pairs_matches_by_case_token(tmp_path):
     assert ct.endswith("RibFrac1-image.nii.gz")
     assert seg.endswith("RibFrac1-rib-seg.nii.gz")
 
+def test_ctspine1k_pairs_matches_uid_across_source_dirs(tmp_path):
+    from ai_bone.datasets.make_pairs import ctspine1k_pairs
+    vol = tmp_path / "volumes" / "COLONOG"; vol.mkdir(parents=True)
+    lab = tmp_path / "labels" / "COLONOG"; lab.mkdir(parents=True)
+    (vol / "1.2.3.0001.nii.gz").write_bytes(b"")
+    (vol / "1.2.3.0002.nii.gz").write_bytes(b"")               # no seg
+    (lab / "1.2.3.0001_seg.nii.gz").write_bytes(b"")
+    (lab / "1.2.3.0009_seg.nii.gz").write_bytes(b"")           # no ct
+    pairs = ctspine1k_pairs(str(tmp_path / "volumes"), str(tmp_path / "labels"))
+    assert len(pairs) == 1
+    ct, seg, cid = pairs[0]
+    assert cid == "1.2.3.0001"
+    assert ct.endswith("1.2.3.0001.nii.gz") and seg.endswith("1.2.3.0001_seg.nii.gz")
+
 def test_workers_gt1_with_injected_io_stays_sequential(tmp_path):
     # Injected reader/writer can't be pickled to a Pool, so workers>1 must fall
     # back to the sequential path (no crash, same result).
