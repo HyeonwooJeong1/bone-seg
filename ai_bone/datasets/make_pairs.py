@@ -66,6 +66,30 @@ def ctpelvic1k_pairs(ct_root, mask_root):
     return [(ctm[t], sgm[t], t) for t in ctm if t in sgm]
 
 
+def verse_pairs(root):
+    """Match VerSe CT (rawdata/sub-*/..._ct.nii.gz) ↔ vertebra seg
+    (derivatives/sub-*/..._seg-vert_msk.nii.gz) by BIDS scan token.
+
+    Matching by the scan token (basename minus _ct / _seg-vert_msk) naturally
+    DEDUPES the VerSe19/VerSe20 overlap: the same subject/scan appearing in
+    multiple split zips collapses to one pair. Skips __MACOSX/._ resource-fork
+    junk that the macOS-zipped archives carry."""
+    def clean(paths):
+        return [p for p in paths if "__MACOSX" not in p
+                and not os.path.basename(p).startswith("._")]
+    ct = clean(glob.glob(os.path.join(root, "**", "rawdata", "**", "*_ct.nii.gz"),
+                         recursive=True))
+    seg = clean(glob.glob(os.path.join(root, "**", "derivatives", "**",
+                                       "*_seg-vert_msk.nii.gz"), recursive=True))
+    seg_by = {_token(s, "_seg-vert_msk"): s for s in sorted(seg)}
+    pairs = {}
+    for c in sorted(ct):                      # first occurrence of a token wins →
+        t = _token(c, "_ct")                  # duplicate scan across split zips deduped
+        if t in seg_by and t not in pairs:
+            pairs[t] = (c, seg_by[t], t)
+    return list(pairs.values())
+
+
 def ctspine1k_pairs(vol_root, label_root):
     """Match CTSpine1K CT (raw_data/volumes/<SRC>/<UID>.nii.gz) ↔ seg
     (raw_data/labels/<SRC>/<UID>_seg.nii.gz) by the shared <UID> token.
@@ -97,7 +121,8 @@ def main():
     import argparse
     ap = argparse.ArgumentParser(description="Build a [ct,seg,id] pairs manifest.")
     ap.add_argument("--dataset", required=True,
-                    choices=["totalseg", "ctpelvic1k", "ribseg", "ctspine1k", "generic"])
+                    choices=["totalseg", "ctpelvic1k", "ribseg", "ctspine1k",
+                             "verse", "generic"])
     ap.add_argument("--out", required=True)
     # totalseg
     ap.add_argument("--root", help="extracted dataset root")
@@ -120,6 +145,8 @@ def main():
         pairs = ribseg_pairs(args.ct_root, args.mask_root)
     elif args.dataset == "ctspine1k":
         pairs = ctspine1k_pairs(args.ct_root, args.mask_root)
+    elif args.dataset == "verse":
+        pairs = verse_pairs(args.root)
     else:
         pairs = match_by_token(sorted(glob.glob(args.ct_glob)),
                                sorted(glob.glob(args.seg_glob)),

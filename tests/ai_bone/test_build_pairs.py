@@ -72,6 +72,24 @@ def test_ctspine1k_pairs_matches_uid_across_source_dirs(tmp_path):
     assert cid == "1.2.3.0001"
     assert ct.endswith("1.2.3.0001.nii.gz") and seg.endswith("1.2.3.0001_seg.nii.gz")
 
+def test_verse_pairs_dedupes_splits_and_skips_macosx(tmp_path):
+    from ai_bone.datasets.make_pairs import verse_pairs
+    def mk(rel):
+        p = tmp_path / rel; p.parent.mkdir(parents=True, exist_ok=True); p.write_bytes(b"")
+    # same scan token in two split folders → dedupes to one pair
+    mk("dataset-verse19validation/rawdata/sub-verse010/sub-verse010_ct.nii.gz")
+    mk("dataset-verse19validation/derivatives/sub-verse010/sub-verse010_seg-vert_msk.nii.gz")
+    mk("dataset-verse20training/rawdata/sub-verse010/sub-verse010_ct.nii.gz")
+    mk("dataset-verse20training/derivatives/sub-verse010/sub-verse010_seg-vert_msk.nii.gz")
+    # a distinct directional scan → kept separately
+    mk("dataset-verse20training/rawdata/sub-gl003/sub-gl003_dir-ax_ct.nii.gz")
+    mk("dataset-verse20training/derivatives/sub-gl003/sub-gl003_dir-ax_seg-vert_msk.nii.gz")
+    # macOS resource-fork junk → must be ignored
+    mk("__MACOSX/dataset-verse19validation/rawdata/sub-verse010/._sub-verse010_ct.nii.gz")
+    pairs = verse_pairs(str(tmp_path))
+    ids = sorted(cid for _, _, cid in pairs)
+    assert ids == ["sub-gl003_dir-ax", "sub-verse010"]   # deduped + junk skipped
+
 def test_workers_gt1_with_injected_io_stays_sequential(tmp_path):
     # Injected reader/writer can't be pickled to a Pool, so workers>1 must fall
     # back to the sequential path (no crash, same result).
