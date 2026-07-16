@@ -7,3 +7,5 @@ scikit-image
 matplotlib
 gdown
 osfclient
+pydicom-seg
+boto3
