@@ -3,7 +3,7 @@ from ai_bone import taxonomy_v1 as tx
 def test_counts():
     assert tx.NUM_CLASSES == 54          # bg + 53 fg
     assert len(tx.FG_NAMES) == 53
-    assert tx.IGNORE_LABEL == 255
+    assert tx.IGNORE_LABEL == 54
 
 def test_roundtrip_unique():
     # id<->name 왕복 + 중복 없음

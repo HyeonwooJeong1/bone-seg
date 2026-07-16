@@ -1,6 +1,8 @@
 """통합 전신 뼈 taxonomy v1 (축골격 + 골반대). 배경=0, 전경 53클래스."""
 
-IGNORE_LABEL = 255
+# nnU-Net requires the ignore label to be the HIGHEST label value (max_fg + 1).
+# Foreground ids are 1..53 (bg=0), so ignore = 54 = NUM_CLASSES.
+IGNORE_LABEL = 54
 
 def _build():
     d = {0: "background", 1: "Skull"}

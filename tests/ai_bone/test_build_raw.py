@@ -6,7 +6,7 @@ def test_dataset_json_has_all_labels_and_ignore(tmp_path):
     d = write_dataset_json(tmp_path, num_training=3, present_union=set(tx.FG_NAMES))
     assert d["labels"]["background"] == 0
     assert d["labels"]["Hip_R"] == 53
-    assert d["labels"]["ignore"] == 255
+    assert d["labels"]["ignore"] == 54
     assert d["numTraining"] == 3
     assert (tmp_path/"dataset.json").exists()
 

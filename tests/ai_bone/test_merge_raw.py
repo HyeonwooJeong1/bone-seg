@@ -29,6 +29,6 @@ def test_merge_raw_prefixes_and_aggregates(tmp_path):
     assert os.path.exists(os.path.join(out, "labelsTr", "totalseg__s1.present.json"))
     # dataset.json + case→dataset map
     dj = json.loads(open(os.path.join(out, "dataset.json")).read())
-    assert dj["numTraining"] == 3 and dj["labels"]["ignore"] == 255
+    assert dj["numTraining"] == 3 and dj["labels"]["ignore"] == 54
     c2d = json.loads(open(os.path.join(out, "case_datasets.json")).read())
     assert c2d["totalseg__s0"] == "totalseg" and c2d["ctpelvic1k__c0"] == "ctpelvic1k"

@@ -40,7 +40,7 @@ def test_build_from_pairs_writes_good_skips_bad(tmp_path):
 
     dj = json.loads((out / "dataset.json").read_text(encoding="utf-8"))
     assert dj["numTraining"] == 1
-    assert dj["labels"]["ignore"] == 255
+    assert dj["labels"]["ignore"] == 54
 
 def test_ribseg_pairs_matches_by_case_token(tmp_path):
     from ai_bone.datasets.make_pairs import ribseg_pairs

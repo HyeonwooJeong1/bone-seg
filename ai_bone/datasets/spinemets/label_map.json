@@ -59,7 +59,7 @@
   },
   "grouped": {
     "ignore_passthrough": {
-      "source_value": 255,
+      "source_value": 54,
       "covers": []
     }
   },
