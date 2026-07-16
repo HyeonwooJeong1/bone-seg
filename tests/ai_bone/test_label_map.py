@@ -14,6 +14,15 @@ def test_remap_basic(tmp_path):
     out = lm.remap_array(arr)
     assert out.tolist() == [0, tx.name_to_id("C1"), tx.name_to_id("C2"), tx.name_to_id("C1")]
 
+def test_remap_accepts_float_dtype_masks(tmp_path):
+    # VerSe dir-iso resamples arrive as float; remap must cast indices to int.
+    p = _write(tmp_path, {
+        "dataset":"verse","source_format":"nifti_seg","provenance_license":"public",
+        "map":{"1":"C1","2":"C2"}, "grouped":{}, "present_labels":["C1","C2"]})
+    lm = load_label_map(p)
+    out = lm.remap_array(np.array([0.0, 1.0, 2.0, 1.0], dtype=np.float32))
+    assert out.tolist() == [0, tx.name_to_id("C1"), tx.name_to_id("C2"), tx.name_to_id("C1")]
+
 def test_grouped_becomes_ignore(tmp_path):
     p = _write(tmp_path, {
         "dataset":"ctpelvic1k","source_format":"nifti_seg","provenance_license":"public",

@@ -33,7 +33,10 @@ class LabelMap:
             lut[int(v)] = tx.name_to_id(name)
         for g in self.grouped.values():
             lut[int(g["source_value"])] = tx.IGNORE_LABEL
-        safe = np.where(arr < len(lut), arr, 0)   # 미정의 원본값 → 배경
+        # Some source masks (e.g. VerSe dir-iso resamples) are stored float-typed;
+        # cast the gather indices to int so LUT indexing works (label values are
+        # integer-valued regardless of storage dtype).
+        safe = np.where(arr < len(lut), arr, 0).astype(np.intp)   # 미정의 원본값 → 배경
         return lut[safe].astype(np.int32)
 
 def load_label_map(path) -> LabelMap:
