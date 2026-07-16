@@ -76,28 +76,67 @@ def read_ct_series(series_dir):
     return reader.Execute()
 
 
+def _seg_geometry(ds):
+    """Pull (orientation iop, pixel spacing) from a DICOM-SEG's shared functional
+    groups (falls back to top-level tags)."""
+    sh = ds.SharedFunctionalGroupsSequence[0]
+    iop = [float(x) for x in sh.PlaneOrientationSequence[0].ImageOrientationPatient]
+    ps = [float(x) for x in sh.PixelMeasuresSequence[0].PixelSpacing]
+    return iop, ps
+
+
+def decode_seg_volume(ds):
+    """Reconstruct a DICOM-SEG (pydicom Dataset) into (combined uint8 array of
+    unified ids [z,y,x], sitk-style geometry dict) WITHOUT pydicom_seg/highdicom.
+
+    Each SEG frame is a binary mask for one (segment, slice); we place frames by
+    their ReferencedSegmentNumber and ImagePositionPatient projected on the slice
+    normal. Returns (None, None) if no taxonomy-relevant segments."""
+    import numpy as np
+    frames = ds.pixel_array
+    if frames.ndim == 2:                       # single-frame SEG
+        frames = frames[None]
+    iop, ps = _seg_geometry(ds)
+    normal = np.cross(iop[:3], iop[3:6])
+    pffg = ds.PerFrameFunctionalGroupsSequence
+    recs = []
+    for i, fg in enumerate(pffg):
+        seg_num = int(fg.SegmentIdentificationSequence[0].ReferencedSegmentNumber)
+        ipp = [float(x) for x in fg.PlanePositionSequence[0].ImagePositionPatient]
+        recs.append((seg_num, ipp, i))
+    zvals = sorted({round(float(np.dot(r[1], normal)), 3) for r in recs})
+    z_index = {z: k for k, z in enumerate(zvals)}
+    nz, R, C = len(zvals), frames.shape[1], frames.shape[2]
+    label_of = {int(s.SegmentNumber): getattr(s, "SegmentLabel", "")
+                for s in ds.SegmentSequence}
+    segvols = {}
+    for seg_num, ipp, fi in recs:
+        z = z_index[round(float(np.dot(ipp, normal)), 3)]
+        segvols.setdefault(seg_num, np.zeros((nz, R, C), np.uint8))
+        segvols[seg_num][z] = frames[fi] > 0
+    combined = combine_segments([(label_of.get(n, ""), v) for n, v in segvols.items()])
+    if combined is None:
+        return None, None
+    origin = next(r[1] for r in recs if round(float(np.dot(r[1], normal)), 3) == zvals[0])
+    dz = abs(zvals[1] - zvals[0]) if nz > 1 else float(getattr(ds, "SpacingBetweenSlices", 1.0))
+    geom = {"spacing": (ps[1], ps[0], dz), "origin": tuple(origin),
+            "direction": (iop[0], iop[3], normal[0], iop[1], iop[4], normal[1],
+                          iop[2], iop[5], normal[2])}
+    return combined, geom
+
+
 def seg_to_unified_image(seg_path, ref_ct):
     """Decode a DICOM-SEG file → SimpleITK image of unified ids resampled onto the
     CT grid (nearest-neighbour), so it shares CT geometry/shape exactly."""
-    import numpy as np
     import pydicom
-    import pydicom_seg
     import SimpleITK as sitk
-
-    ds = pydicom.dcmread(seg_path)
-    result = pydicom_seg.SegmentReader().read(ds)
-    label_of = {s.SegmentNumber: getattr(s, "SegmentLabel", "")
-                for s in ds.SegmentSequence}
-    binaries, ref = [], None
-    for num in result.available_segments:
-        seg_img = result.segment_image(num)          # sitk binary in SEG geometry
-        binaries.append((label_of.get(num, ""), sitk.GetArrayFromImage(seg_img)))
-        ref = ref or seg_img
-    combined = combine_segments(binaries)
+    combined, geom = decode_seg_volume(pydicom.dcmread(seg_path))
     if combined is None:
         return None
-    seg_img = sitk.GetImageFromArray(combined)
-    seg_img.CopyInformation(ref)
+    seg_img = sitk.GetImageFromArray(combined)        # array is [z,y,x]
+    seg_img.SetSpacing(geom["spacing"])
+    seg_img.SetOrigin(geom["origin"])
+    seg_img.SetDirection(geom["direction"])
     # place on the CT grid → guarantees size_match with the CT in build_raw/verify
     return sitk.Resample(seg_img, ref_ct, sitk.Transform(), sitk.sitkNearestNeighbor,
                          0, sitk.sitkUInt8)
