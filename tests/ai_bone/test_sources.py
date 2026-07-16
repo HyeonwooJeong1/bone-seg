@@ -28,11 +28,13 @@ def test_ctspine1k_is_huggingface_rawdata_only():
     assert src.get("repo_id") == "alexanderdann/CTSpine1K"
     assert src.get("allow_patterns") == ["raw_data/**", "metadata/**"]  # skip Arrow export
 
-def test_ribseg_gdrive_and_verse_osf():
+def test_ribseg_gdrive_and_verse_http():
     rs = SOURCES["ribseg"]
     assert rs["method"] == "gdrive" and rs["file_id"] == "1ZZGGrhd0y1fLyOZGo_Y-wlVUP4lkHVgm"
     vs = SOURCES["verse"]
-    assert vs["method"] == "osf" and vs["osf_projects"] == ["nqjyw", "t98fz"]
+    assert vs["method"] == "http"
+    assert len(vs["urls"]) == 6 and all(u.endswith(".zip") for u in vs["urls"])
+    assert all("bonescreen.de" in u for u in vs["urls"])
 
 def test_get_source_unknown_raises():
     import pytest

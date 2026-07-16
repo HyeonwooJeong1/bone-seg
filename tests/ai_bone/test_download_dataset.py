@@ -36,6 +36,14 @@ def test_zenodo_force_downloads(tmp_path):
     p = tmp_path / "totalseg" / "a.bin"
     assert p.exists() and p.read_bytes() == b"abc"
 
+def test_http_downloads_all_urls(tmp_path):
+    # 'verse' is method http with 6 S3 zips → each URL fetched to its basename.
+    sess = _Sess(_MANIFEST)
+    out = download_dataset("verse", str(tmp_path), session=sess, force=True, logf=lambda *a: None)
+    assert len(out) == 6
+    assert (tmp_path / "verse" / "dataset-verse19training.zip").read_bytes() == b"abc"
+    assert (tmp_path / "verse" / "dataset-verse20test.zip").exists()
+
 def test_zenodo_multirecord_loops_all_records(tmp_path):
     # ribfrac_ct has 3 records; each fake record yields 1 file → 3 downloads.
     sess = _Sess(_MANIFEST)

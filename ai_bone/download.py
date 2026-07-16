@@ -48,6 +48,19 @@ def download_dataset(name, dest_root, session=None, force=False, logf=print,
             logf(f"[{name}] gdrive file {fid} → {dest}")
             out.append(str(gdown.download(id=fid, output=dest + os.sep, quiet=False)))
         return out
+    if src["method"] == "http":
+        import os
+        dest = os.path.join(dest_root, name)
+        os.makedirs(dest, exist_ok=True)
+        if session is None:
+            import requests
+            session = requests.Session()
+        out = []
+        for url in src["urls"]:
+            fn = os.path.join(dest, url.rstrip("/").split("/")[-1])
+            logf(f"[{name}] http download {url} → {fn}")
+            out.append(str(download_file(url, fn, session=session)))
+        return out
     if src["method"] == "osf":
         import os, subprocess
         out = []

@@ -35,10 +35,21 @@ SOURCES = {
                  "at build time via the verify_dataset overlap gate.",
     },
     "verse": {
-        "method": "osf", "osf_projects": ["nqjyw", "t98fz"], "verified": True,
+        "method": "http", "verified": True,
+        "urls": [
+            "https://s3.bonescreen.de/public/VerSe-complete/dataset-verse19training.zip",
+            "https://s3.bonescreen.de/public/VerSe-complete/dataset-verse19validation.zip",
+            "https://s3.bonescreen.de/public/VerSe-complete/dataset-verse19test.zip",
+            "https://s3.bonescreen.de/public/VerSe-complete/dataset-verse20training.zip",
+            "https://s3.bonescreen.de/public/VerSe-complete/dataset-verse20validation.zip",
+            "https://s3.bonescreen.de/public/VerSe-complete/dataset-verse20test.zip",
+        ],
         "landing_url": "https://github.com/anjany/verse",
-        "notes": "VerSe'19 = OSF nqjyw, VerSe'20 = OSF t98fz (rawdata=CT .nii.gz, "
-                 "derivatives=seg masks + centroid .json). Public → osfclient.",
+        "notes": "VerSe'19+'20 COMPLETE (CT .nii.gz + seg masks + centroid .json, "
+                 "BIDS layout) via direct bonescreen S3 zips — the OSF projects put "
+                 "the big data behind external storage that osfclient can't fetch "
+                 "(403). CC BY-SA 4.0. Vertebra labels 1-28 (25=L6, 26=sacrum, "
+                 "28=T13); confirm exact set at build time.",
     },
     "ctspine1k": {
         "method": "huggingface", "repo_id": "alexanderdann/CTSpine1K",
@@ -93,7 +104,7 @@ SOURCES = {
     },
 }
 
-_ALLOWED_METHODS = {"zenodo", "huggingface", "gdrive", "osf", "manual"}
+_ALLOWED_METHODS = {"zenodo", "huggingface", "gdrive", "osf", "http", "manual"}
 
 
 def get_source(name):
