@@ -273,6 +273,15 @@ docker run -d --name preprocess --user "$(id -u):$(id -g)" --tmpfs /tmp:size=32g
 
 ## 7. 다음 단계 (GPU 학습 — **사용자 허락 전 금지**)
 
+### 7.0 학습 전 준비 상태 (2026-07-17 갱신)
+GPU-free 준비물은 **완료**됨(커밋 `f19485a`, 108 테스트):
+- ✅ **marginal 부분라벨 trainer 완성** (`nnUNetTrainerMarginal`): loss 벡터화 + **ignore(54) 복셀 마스킹** + present.json을 **RAW labelsTr**에서 로드 + nnU-Net DS 래퍼 재사용 + train/validation_step에서 present stash. **이미지에서 import·discovery 검증됨**(MRO: Marginal→NoMirroring_ES_PL→ES→NoMirroring; `recursive_find_python_class`로 `-tr nnUNetTrainerMarginal` 발견 확인). Dockerfile에 등록 완료 → **이미지 재빌드 완료**(marginal_trainer가 nnunetv2에 baked-in).
+- ✅ **CV splits 생성 완료**: `ai_bone/train/make_splits.py` → `/data1/bone/nnunet/preprocessed/Dataset520_UnifiedFT/splits_final.json`(+`test_ids.json`). **trainpool 2721 / test 534**(Spine-Mets 54 전부 도메인 홀드아웃 + 나머지 15% test, fold별 val은 데이터셋 stratified).
+
+**남은 것 = GPU 필요**:
+- ⏳ **1-epoch 스모크 테스트**(GPU): `batch['keys']`가 case id를 담는지, marginal loss+present mask+DS가 end-to-end 도는지, whole-body 0.6mm patch [224,80,128]·batch2 **VRAM** 확인. `train_step`/`validation_step`이 nnU-Net 2.8.1 API와 정확히 맞는지 최종 확인(runbook §7).
+- ⏳ **CADS 사전학습 θ0**(아래).
+
 준비되면 순서:
 1. **CADS 사전학습 데이터 정비**: `/data1/bone/raw/cads`에 52G/24814파일(SAROS/CT-ORG/AMOS subset) 있음(다운로드가 hung이라 kill함). CADS는 per-structure 바이너리 → `part_NNN`→구조 매핑 표가 필요(아직 미정, `combine.py` 확장 필요). 부족하면 Docker로 `python -m ai_bone.download cads --allow <shard>` 재개.
 2. **사전학습(Stage1)**: CADS 의사라벨로 θ0 학습 → `Dataset500_AxialPretrain`(예정). `stage1_pretrain.sh` 참고.
