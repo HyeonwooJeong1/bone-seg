@@ -15,6 +15,7 @@ ENV PYTHONPATH=/opt/ai_bone
 # Make the custom nnU-Net trainers discoverable by `-tr` (copy into nnunetv2).
 RUN NND=$(python -c "import nnunetv2,os;print(os.path.join(os.path.dirname(nnunetv2.__file__),'training','nnUNetTrainer'))") && \
     cp /opt/ai_bone/ai_bone/train/partial_label_trainer.py  "$NND"/ && \
+    cp /opt/ai_bone/ai_bone/train/marginal_trainer.py       "$NND"/ && \
     cp /opt/ai_bone/ai_bone/train/merit_finetune_trainer.py "$NND"/ && \
     (cp /opt/ai_bone/ai_bone/nnUNetTrainerNoMirroring_ES.py "$NND"/ || true)
 
