@@ -293,7 +293,11 @@ GPU-free 준비물은 **완료**됨(커밋 `f19485a`, 108 테스트):
    ```
    - **반드시 Docker(GPU 옵션)로.** `train/docker_train.sh` 참고(bone-pipeline, bind-mount 없이).
    - `marginal_trainer.py`의 train_step(deep supervision/AMP)을 GPU에서 마무리.
-4. **MERIT 실험**: `estimate_conflict.py`로 데이터셋별 gradient→충돌행렬→`pca_conflict_split`으로 브랜치 분할→브랜치별 학습→`merge.py`로 병합. baseline(joint/random/soups) 대비 비교. `merge_diagnostics.py`로 진단.
+4. **MERIT 실험** (오케스트레이션 코드 완비, GPU-free 검증됨):
+   - **분할 3전략** `ai_bone/merit/orchestrate.py`: `assign_conflict`(gradient PCA, estimate_conflict 필요=GPU) / `assign_anatomy`(척추·늑골·골반·전신, GPU 불필요) / `assign_random`. `build(strategy,...)` → `branch_folds`(entry b = branch b, nnU-Net `fold=b`로 그 브랜치 데이터만 학습) + `merge_weights`(train case 수).
+   - **생성된 아티팩트**(서버 `/data1/bone/nnunet/merit/`): `anatomy.json`(4브랜치: 골반67·늑골337·척추937·전신834), `random.json`(2브랜치). conflict는 θ0 있어야 생성.
+   - **브랜치 학습**: `branch_folds`를 splits로 써서 각 브랜치 학습(GPU). **병합**: `ai_bone/merit/merge_checkpoints.py`로 N개 .pth를 case-가중 평균(dtype-safe) 또는 TIES 병합 → 단일 체크포인트. CLI가 orchestrate 아티팩트의 merge_weights 사용.
+   - baseline(joint/anatomy/random/soups) 대비 비교. `merge_diagnostics.py`로 진단(LMC/displacement/perturbation).
 5. **평가**: `eval/evaluate.py`로 DSC/NSD/HD95/PQ/L-R swap 등, region/difficulty별. VerSe 등은 instance metric.
 
 ---
