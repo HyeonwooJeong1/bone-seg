@@ -6,16 +6,16 @@
 #
 # Usage:  bash run_queue.sh "0,1" jobs.txt
 # jobs.txt: one job per line ->  DATASET_ID CONFIG FOLD TRAINER [PRETRAINED_CKPT]
-#   e.g.    510 3d_fullres 0 nnUNetTrainerNoMirroring_ES_PL /data1/bone/nnunet/results/Dataset500_AxialPretrain/nnUNetTrainerNoMirroring_ES_PL__nnUNetPlans_iso06__3d_fullres/fold_all/checkpoint_final.pth
+#   e.g.    510 3d_fullres 0 nnUNetTrainerNoMirroring_ES_PL /data1/hyeonwoo/bone/nnunet/results/Dataset500_AxialPretrain/nnUNetTrainerNoMirroring_ES_PL__nnUNetPlans_iso06__3d_fullres/fold_all/checkpoint_final.pth
 # Lines starting with # are ignored.
 set -uo pipefail
 GPUS_CSV="${1:?comma-separated gpu ids, e.g. 0,1}"
 JOBS="${2:?jobs file}"
 
 source ~/miniforge3/etc/profile.d/conda.sh && conda activate pt210_py312
-export nnUNet_raw=/data1/bone/nnunet/raw
+export nnUNet_raw=/data1/hyeonwoo/bone/nnunet/raw
 export nnUNet_preprocessed=/home/ubuntu/nnunet_pre
-export nnUNet_results=/data1/bone/nnunet/results
+export nnUNet_results=/data1/hyeonwoo/bone/nnunet/results
 export LD_LIBRARY_PATH=$CONDA_PREFIX/lib:${LD_LIBRARY_PATH:-}
 export nnUNet_compile=f
 # Feed the H100 so it isn't starved by CPU augmentation; raise if util stays low.
@@ -23,7 +23,7 @@ export nnUNet_n_proc_DA=${nnUNet_n_proc_DA:-24}
 
 IFS=',' read -r -a GPUS <<< "$GPUS_CSV"
 NG=${#GPUS[@]}
-mkdir -p /data1/bone/train_logs
+mkdir -p /data1/hyeonwoo/bone/train_logs
 
 # Round-robin the job list into one queue file per GPU.
 declare -a QF
@@ -40,7 +40,7 @@ run_queue_on_gpu() {   # $1=gpu id   $2=queue file
   local gpu="$1" qf="$2"
   while read -r did cfg fold tr pre; do
     [ -z "${did:-}" ] && continue
-    local log="/data1/bone/train_logs/d${did}_${cfg}_f${fold}_gpu${gpu}.log"
+    local log="/data1/hyeonwoo/bone/train_logs/d${did}_${cfg}_f${fold}_gpu${gpu}.log"
     local args=("$did" "$cfg" "$fold" -p nnUNetPlans_iso06 -tr "$tr" --c)
     [ -n "${pre:-}" ] && args+=(-pretrained_weights "$pre")
     echo "[gpu$gpu] START d$did $cfg fold$fold ($tr) -> $log"

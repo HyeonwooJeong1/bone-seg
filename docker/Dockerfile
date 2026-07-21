@@ -20,9 +20,9 @@ RUN NND=$(python -c "import nnunetv2,os;print(os.path.join(os.path.dirname(nnune
     (cp /opt/ai_bone/ai_bone/nnUNetTrainerNoMirroring_ES.py "$NND"/ || true)
 
 # nnU-Net data roots default to the mounted /data1 (override with -e as needed).
-ENV nnUNet_raw=/data1/bone/nnunet/raw \
-    nnUNet_preprocessed=/data1/bone/nnunet/preprocessed \
-    nnUNet_results=/data1/bone/nnunet/results \
+ENV nnUNet_raw=/data1/hyeonwoo/bone/nnunet/raw \
+    nnUNet_preprocessed=/data1/hyeonwoo/bone/nnunet/preprocessed \
+    nnUNet_results=/data1/hyeonwoo/bone/nnunet/results \
     nnUNet_compile=f
 
 WORKDIR /workspace

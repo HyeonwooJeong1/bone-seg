@@ -30,7 +30,7 @@
 ### 0-A. 이미지 빌드 (코드 바뀔 때마다 재빌드)
 ```bash
 # 코드+docker/를 빌드 컨텍스트로 (데이터 제외)
-mkdir -p /data1/bone/build && cd /data1/bone/build   # ai_bone/ + docker/ 를 여기에 둠
+mkdir -p /data1/hyeonwoo/bone/build && cd /data1/hyeonwoo/bone/build   # ai_bone/ + docker/ 를 여기에 둠
 docker build -t bone-pipeline:latest -f docker/Dockerfile .
 ```
 > `docker/Dockerfile` = `FROM bone-nnunet:2.8.1` + pip(requests·huggingface_hub·scikit-image·
@@ -43,7 +43,7 @@ bash ai_bone/run_in_docker.sh python -m ai_bone.datasets.combine --root ... --ou
 bash ai_bone/run_in_docker.sh python -m ai_bone.build_raw --pairs p.json --dataset totalseg --out ... --workers 16
 ```
 > 내부적으로 `docker run --rm -v /data1:/data1 -w /data1 bone-pipeline python ...`.
-> **workdir는 `/data1`**(≠ `/data1/bone`) — 그래야 host의 `/data1/bone/ai_bone`가 이미지 코드를
+> **workdir는 `/data1`**(≠ `/data1/bone`) — 그래야 host의 `/data1/hyeonwoo/bone/ai_bone`가 이미지 코드를
 > 가리지 않음(PYTHONPATH=`/opt/ai_bone`).
 > 오래 걸리는 작업은 `docker run -d --name job ...` 후 `docker logs -f job`.
 
@@ -59,21 +59,21 @@ bash ai_bone/train/docker_train.sh <GPU> <DID> <CFG> <FOLD> <TRAINER> [PRETRAINE
 # 1) 압축 해제 (host에 unzip 없으면 컨테이너 python으로)
 docker run -d --name extract -v /data1:/data1 bone-pipeline:latest python - <<'PY'
 import zipfile,tarfile,glob,os
-raw="/data1/bone/raw"
+raw="/data1/hyeonwoo/bone/raw"
 zipfile.ZipFile(raw+"/totalseg/Totalsegmentator_dataset_v201.zip").extractall(raw+"/totalseg_ext")
 for t in glob.glob(raw+"/ctpelvic1k/*.tar.gz"): tarfile.open(t).extractall(raw+"/ctpelvic1k_ext")
 PY
 # 2) TotalSeg 구조별 바이너리 → 합치기 (unified id seg)
 bash ai_bone/run_in_docker.sh python -m ai_bone.datasets.combine \
-  --root /data1/bone/raw/totalseg_ext --out /data1/bone/raw/totalseg_combined
+  --root /data1/hyeonwoo/bone/raw/totalseg_ext --out /data1/hyeonwoo/bone/raw/totalseg_combined
 # 3) pairs 매니페스트
 bash ai_bone/run_in_docker.sh python -m ai_bone.datasets.make_pairs --dataset totalseg \
-  --root /data1/bone/raw/totalseg_ext --combined /data1/bone/raw/totalseg_combined --out /data1/bone/pairs_totalseg.json
+  --root /data1/hyeonwoo/bone/raw/totalseg_ext --combined /data1/hyeonwoo/bone/raw/totalseg_combined --out /data1/hyeonwoo/bone/pairs_totalseg.json
 bash ai_bone/run_in_docker.sh python -m ai_bone.datasets.make_pairs --dataset ctpelvic1k \
-  --ct-root /data1/bone/raw/ctpelvic1k_ext --mask-root /data1/bone/raw/ctpelvic1k_ext --out /data1/bone/pairs_ctpelvic1k.json
+  --ct-root /data1/hyeonwoo/bone/raw/ctpelvic1k_ext --mask-root /data1/hyeonwoo/bone/raw/ctpelvic1k_ext --out /data1/hyeonwoo/bone/pairs_ctpelvic1k.json
 # 4) 통합 빌드 (verify 게이트, CPU 병렬 16)
-bash ai_bone/run_in_docker.sh python -m ai_bone.build_raw --pairs /data1/bone/pairs_totalseg.json \
-  --dataset totalseg --out /data1/bone/nnunet/raw/Dataset510_AxialFT --workers 16
+bash ai_bone/run_in_docker.sh python -m ai_bone.build_raw --pairs /data1/hyeonwoo/bone/pairs_totalseg.json \
+  --dataset totalseg --out /data1/hyeonwoo/bone/nnunet/raw/Dataset510_AxialFT --workers 16
 ```
 
 ---
@@ -93,9 +93,9 @@ source ~/miniforge3/etc/profile.d/conda.sh && conda activate pt210_py312
 ### 1-B. nnU-Net 환경변수 설정
 
 ```bash
-export nnUNet_raw=/data1/bone/nnunet/raw
+export nnUNet_raw=/data1/hyeonwoo/bone/nnunet/raw
 export nnUNet_preprocessed=/home/ubuntu/nnunet_pre
-export nnUNet_results=/data1/bone/nnunet/results
+export nnUNet_results=/data1/hyeonwoo/bone/nnunet/results
 export LD_LIBRARY_PATH=$CONDA_PREFIX/lib:${LD_LIBRARY_PATH:-}
 export nnUNet_compile=f
 ```
@@ -108,9 +108,9 @@ export nnUNet_compile=f
 
 ```bash
 source ~/miniforge3/etc/profile.d/conda.sh && conda activate pt210_py312 && \
-  export nnUNet_raw=/data1/bone/nnunet/raw \
+  export nnUNet_raw=/data1/hyeonwoo/bone/nnunet/raw \
          nnUNet_preprocessed=/home/ubuntu/nnunet_pre \
-         nnUNet_results=/data1/bone/nnunet/results \
+         nnUNet_results=/data1/hyeonwoo/bone/nnunet/results \
          LD_LIBRARY_PATH=$CONDA_PREFIX/lib:${LD_LIBRARY_PATH:-} \
          nnUNet_compile=f
 ```
@@ -159,7 +159,7 @@ OK: 두 trainer 모두 import 성공
 저장 디렉토리를 만듭니다:
 
 ```bash
-mkdir -p /data1/bone/raw/{totalseg,verse,ctspine1k,ribseg,ctpelvic1k,spinemets,mug500,cads}
+mkdir -p /data1/hyeonwoo/bone/raw/{totalseg,verse,ctspine1k,ribseg,ctpelvic1k,spinemets,mug500,cads}
 ```
 
 ### 2-B. 데이터셋별 다운로드
@@ -171,7 +171,7 @@ mkdir -p /data1/bone/raw/{totalseg,verse,ctspine1k,ribseg,ctpelvic1k,spinemets,m
 > 데이터셋별 소스는 `ai_bone/datasets/sources.py`에 등록돼 있습니다.
 > **자동 다운로드 (verified, record 확인됨):** `totalseg`(Zenodo 10047292), `ctpelvic1k`(4588403), `ribfrac_ct`(RibFrac CT = 3893508/3893498/3893496 다중 record) — 바로 받아집니다:
 > ```bash
-> python -m ai_bone.download ribfrac_ct --dest /data1/bone/raw
+> python -m ai_bone.download ribfrac_ct --dest /data1/hyeonwoo/bone/raw
 > ```
 > **수동 (auth/특수 클라이언트 필요):** `cads`(HuggingFace), `spinemets`(TCIA), `verse`(OSF: osf.io/nqjyw·t98fz), `ctspine1k`(GDrive), `mug500`(Figshare), 그리고 **RibSeg 늑골 마스크**(RibSeg v2 = GDrive / v1 = Zenodo 5336592). 이들은 CLI가 안내만 출력하니 각 landing에서 받으십시오.
 > **⚠ 미검증 소스:** `verified: False`인 항목은 `--force` 없이는 landing URL만 출력합니다. landing에서 실제 값 확인 후 `sources.py`의 `verified`를 True로 바꾸거나 `--force`로 실행하십시오.
@@ -180,10 +180,10 @@ mkdir -p /data1/bone/raw/{totalseg,verse,ctspine1k,ribseg,ctpelvic1k,spinemets,m
 **TotalSegmentator v2 (앵커 FT, ~40GB, Zenodo)**
 
 ```bash
-cd /data1/bone/raw/totalseg
+cd /data1/hyeonwoo/bone/raw/totalseg
 python -m ai_bone.download \
   --zenodo-record 10047292 \
-  --out /data1/bone/raw/totalseg \
+  --out /data1/hyeonwoo/bone/raw/totalseg \
   --parallel 8
 ```
 
@@ -195,7 +195,7 @@ python -m ai_bone.download \
 ```bash
 python -m ai_bone.download \
   --github-url https://github.com/anjany/verse \
-  --out /data1/bone/raw/verse
+  --out /data1/hyeonwoo/bone/raw/verse
 ```
 
 **CTSpine1K (~10GB, GitHub release)**
@@ -203,7 +203,7 @@ python -m ai_bone.download \
 ```bash
 python -m ai_bone.download \
   --github-url https://github.com/MIRACLE-Center/CTSpine1K \
-  --out /data1/bone/raw/ctspine1k
+  --out /data1/hyeonwoo/bone/raw/ctspine1k
 ```
 
 **RibSeg v2 (~8GB, Zenodo)**
@@ -211,7 +211,7 @@ python -m ai_bone.download \
 ```bash
 python -m ai_bone.download \
   --zenodo-record 7205939 \
-  --out /data1/bone/raw/ribseg \
+  --out /data1/hyeonwoo/bone/raw/ribseg \
   --parallel 8
 ```
 
@@ -220,7 +220,7 @@ python -m ai_bone.download \
 ```bash
 python -m ai_bone.download \
   --zenodo-record 4588403 \
-  --out /data1/bone/raw/ctpelvic1k \
+  --out /data1/hyeonwoo/bone/raw/ctpelvic1k \
   --parallel 8
 ```
 
@@ -234,7 +234,7 @@ python -c "
 from tcia_utils import nbia
 nbia.downloadSeries(
     series_data=nbia.getSeries(collection='Spine-Mets-CT-SEG'),
-    path='/data1/bone/raw/spinemets'
+    path='/data1/hyeonwoo/bone/raw/spinemets'
 )
 "
 ```
@@ -244,7 +244,7 @@ nbia.downloadSeries(
 ```bash
 python -m ai_bone.download \
   --figshare-doi 10.6084/m9.figshare.9616168 \
-  --out /data1/bone/raw/mug500
+  --out /data1/hyeonwoo/bone/raw/mug500
 ```
 
 **CADS 축골격 subset (HuggingFace, 사전학습 전용)**
@@ -253,7 +253,7 @@ python -m ai_bone.download \
 python -m ai_bone.download \
   --huggingface-repo StanfordMIMI/CADS \
   --subset axial_skeleton \
-  --out /data1/bone/raw/cads
+  --out /data1/hyeonwoo/bone/raw/cads
 ```
 
 > CADS 라이선스: **CC BY-NC-SA** — 사전학습 전용. 상업 배포 불가.
@@ -266,7 +266,7 @@ python -m ai_bone.download \
 # 예시: TotalSegmentator 재개
 python -m ai_bone.download \
   --zenodo-record 10047292 \
-  --out /data1/bone/raw/totalseg \
+  --out /data1/hyeonwoo/bone/raw/totalseg \
   --parallel 8
 # 이미 받은 파일은 건너뜁니다.
 ```
@@ -277,7 +277,7 @@ python -m ai_bone.download \
 
 ```bash
 for ds in totalseg verse ctspine1k ribseg ctpelvic1k spinemets mug500 cads; do
-  cnt=$(find /data1/bone/raw/$ds -name "*.nii.gz" -o -name "*.dcm" 2>/dev/null | wc -l)
+  cnt=$(find /data1/hyeonwoo/bone/raw/$ds -name "*.nii.gz" -o -name "*.dcm" 2>/dev/null | wc -l)
   echo "$ds: $cnt 파일"
 done
 ```
@@ -307,7 +307,7 @@ done
 ```bash
 python -m ai_bone.build_raw \
   --stage pretrain \
-  --raw-roots /data1/bone/raw/cads \
+  --raw-roots /data1/hyeonwoo/bone/raw/cads \
   --out $nnUNet_raw/Dataset500_AxialPretrain \
   --spacing 0.6
 ```
@@ -318,13 +318,13 @@ python -m ai_bone.build_raw \
 python -m ai_bone.build_raw \
   --stage ft \
   --raw-roots \
-    /data1/bone/raw/totalseg \
-    /data1/bone/raw/verse \
-    /data1/bone/raw/ctspine1k \
-    /data1/bone/raw/ribseg \
-    /data1/bone/raw/ctpelvic1k \
-    /data1/bone/raw/spinemets \
-    /data1/bone/raw/mug500 \
+    /data1/hyeonwoo/bone/raw/totalseg \
+    /data1/hyeonwoo/bone/raw/verse \
+    /data1/hyeonwoo/bone/raw/ctspine1k \
+    /data1/hyeonwoo/bone/raw/ribseg \
+    /data1/hyeonwoo/bone/raw/ctpelvic1k \
+    /data1/hyeonwoo/bone/raw/spinemets \
+    /data1/hyeonwoo/bone/raw/mug500 \
   --out $nnUNet_raw/Dataset510_AxialFT \
   --spacing 0.6
 ```
@@ -340,11 +340,11 @@ python -m ai_bone.build_raw \
 ```bash
 python -m ai_bone.verify_dataset \
   --dataset-dir $nnUNet_raw/Dataset500_AxialPretrain \
-  --report /data1/bone/verify_500.json
+  --report /data1/hyeonwoo/bone/verify_500.json
 
 python -m ai_bone.verify_dataset \
   --dataset-dir $nnUNet_raw/Dataset510_AxialFT \
-  --report /data1/bone/verify_510.json
+  --report /data1/hyeonwoo/bone/verify_510.json
 ```
 
 출력 예시 (통과 시):
@@ -359,7 +359,7 @@ Dataset510: 4198 cases checked. PASS (0 empty, 0 size_mismatch, 0 low_overlap)
 # 실패 케이스 목록 확인
 python -c "
 import json
-r = json.load(open('/data1/bone/verify_510.json'))
+r = json.load(open('/data1/hyeonwoo/bone/verify_510.json'))
 fails = [c for c,v in r['cases'].items() if not v['pass']]
 print(f'FAIL {len(fails)} cases:')
 for f in fails[:20]: print(' ', f, r['cases'][f])
@@ -546,7 +546,7 @@ bash ai_bone/train/stage2_baseline.sh 4 2
 
 스크립트가 Stage 1 checkpoint를 자동으로 참조합니다:
 ```
--pretrained_weights /data1/bone/nnunet/results/Dataset500_AxialPretrain/*_all/checkpoint_final.pth
+-pretrained_weights /data1/hyeonwoo/bone/nnunet/results/Dataset500_AxialPretrain/*_all/checkpoint_final.pth
 ```
 
 glob(`*_all`)이 실패하면 수동으로 경로를 지정하십시오:
@@ -598,7 +598,7 @@ python -m ai_bone.merit.estimate_conflict \
 nnUNetTrainerNoMirroring_ES_PL__nnUNetPlans_iso06__3d_fullres/fold_all/checkpoint_final.pth \
   --raw $nnUNet_raw \
   --datasets totalseg,verse,ctspine1k,ribseg,ctpelvic1k,spinemets,mug500 \
-  --out /data1/bone/merit/g_vectors.npz \
+  --out /data1/hyeonwoo/bone/merit/g_vectors.npz \
   --dim 512 \
   --batches 8
 ```
@@ -611,7 +611,7 @@ nnUNetTrainerNoMirroring_ES_PL__nnUNetPlans_iso06__3d_fullres/fold_all/checkpoin
 ```bash
 python -c "
 import numpy as np
-g = np.load('/data1/bone/merit/g_vectors.npz')
+g = np.load('/data1/hyeonwoo/bone/merit/g_vectors.npz')
 print('데이터셋별 gradient 벡터:')
 for k in g.files: print(f'  {k}: shape={g[k].shape}')
 "
@@ -621,9 +621,9 @@ for k in g.files: print(f'  {k}: shape={g[k].shape}')
 
 ```bash
 python -m ai_bone.merit.split \
-  --vectors /data1/bone/merit/g_vectors.npz \
+  --vectors /data1/hyeonwoo/bone/merit/g_vectors.npz \
   --k 2 \
-  --out /data1/bone/merit/partitions.json
+  --out /data1/hyeonwoo/bone/merit/partitions.json
 ```
 
 결과 확인:
@@ -631,7 +631,7 @@ python -m ai_bone.merit.split \
 ```bash
 python -c "
 import json
-p = json.load(open('/data1/bone/merit/partitions.json'))
+p = json.load(open('/data1/hyeonwoo/bone/merit/partitions.json'))
 for pid, datasets in p.items():
     print(f'Partition {pid}: {datasets}')
 "
@@ -653,9 +653,9 @@ Partition 1: ['verse', 'ctspine1k', 'ctpelvic1k', 'spinemets']
 python -c "
 import json, subprocess, sys
 
-p = json.load(open('/data1/bone/merit/partitions.json'))
-raw_root = '/data1/bone/raw'
-nnunet_raw = '/data1/bone/nnunet/raw'
+p = json.load(open('/data1/hyeonwoo/bone/merit/partitions.json'))
+raw_root = '/data1/hyeonwoo/bone/raw'
+nnunet_raw = '/data1/hyeonwoo/bone/nnunet/raw'
 
 for pid, datasets in p.items():
     did = 520 + int(pid)
@@ -688,14 +688,14 @@ nnUNetv2_preprocess \
   -np 16
 
 # SSD 캐시 동기화
-rsync -av /data1/bone/nnunet/pre/ /home/ubuntu/nnunet_pre/
+rsync -av /data1/hyeonwoo/bone/nnunet/pre/ /home/ubuntu/nnunet_pre/
 ```
 
 verify_dataset 게이트:
 
 ```bash
-python -m ai_bone.verify_dataset --dataset-dir $nnUNet_raw/Dataset520_MeritPart0 --report /data1/bone/verify_520.json
-python -m ai_bone.verify_dataset --dataset-dir $nnUNet_raw/Dataset521_MeritPart1 --report /data1/bone/verify_521.json
+python -m ai_bone.verify_dataset --dataset-dir $nnUNet_raw/Dataset520_MeritPart0 --report /data1/hyeonwoo/bone/verify_520.json
+python -m ai_bone.verify_dataset --dataset-dir $nnUNet_raw/Dataset521_MeritPart1 --report /data1/hyeonwoo/bone/verify_521.json
 ```
 
 ### Step D. 파티션별 Fine-tune
@@ -748,7 +748,7 @@ python -m ai_bone.merit.merge \
     $nnUNet_results/Dataset520_MeritPart0/nnUNetTrainerMERITFinetune__nnUNetPlans_iso06__3d_fullres/fold_0/checkpoint_final.pth \
     $nnUNet_results/Dataset521_MeritPart1/nnUNetTrainerMERITFinetune__nnUNetPlans_iso06__3d_fullres/fold_0/checkpoint_final.pth \
   --weights 0.5 0.5 \
-  --out /data1/bone/merit/merged_model_fold0.pth
+  --out /data1/hyeonwoo/bone/merit/merged_model_fold0.pth
 ```
 
 > 가중치 `--weights`는 각 파티션의 케이스 수 비율로 설정하십시오.
@@ -766,7 +766,7 @@ nnUNetTrainerNoMirroring_ES_PL__nnUNetPlans_iso06__3d_fullres/fold_all/checkpoin
     $nnUNet_results/Dataset521_MeritPart1/nnUNetTrainerMERITFinetune__nnUNetPlans_iso06__3d_fullres/fold_0/checkpoint_final.pth \
   --weights 0.5 0.5 \
   --density 0.2 \
-  --out /data1/bone/merit/merged_model_ties_fold0.pth
+  --out /data1/hyeonwoo/bone/merit/merged_model_ties_fold0.pth
 ```
 
 ---
@@ -782,36 +782,36 @@ nnUNetTrainerNoMirroring_ES_PL__nnUNetPlans_iso06__3d_fullres/fold_all/checkpoin
 ```bash
 # Baseline A (Stage 2 joint pooling) 추론
 nnUNetv2_predict \
-  -i /data1/bone/holdout/images \
-  -o /data1/bone/predictions/baseline_a \
+  -i /data1/hyeonwoo/bone/holdout/images \
+  -o /data1/hyeonwoo/bone/predictions/baseline_a \
   -d 510 -c 3d_fullres -f 0 1 2 3 4 \
   -p nnUNetPlans_iso06 -tr nnUNetTrainerNoMirroring_ES_PL \
   --save_probabilities
 
 # MERIT B (병합 모델) 추론
 nnUNetv2_predict \
-  -i /data1/bone/holdout/images \
-  -o /data1/bone/predictions/merit_b \
+  -i /data1/hyeonwoo/bone/holdout/images \
+  -o /data1/hyeonwoo/bone/predictions/merit_b \
   -d 510 -c 3d_fullres -f 0 \
   -p nnUNetPlans_iso06 -tr nnUNetTrainerNoMirroring_ES_PL \
   --disable_tta \
-  -chk /data1/bone/merit/merged_model_fold0.pth
+  -chk /data1/hyeonwoo/bone/merit/merged_model_fold0.pth
 ```
 
 ### 8-B. Dice + HD95 평가 리포트
 
 ```bash
 python -m ai_bone.eval.evaluate \
-  --gt-dir /data1/bone/holdout/labels \
-  --pred-dir /data1/bone/predictions/baseline_a \
+  --gt-dir /data1/hyeonwoo/bone/holdout/labels \
+  --pred-dir /data1/hyeonwoo/bone/predictions/baseline_a \
   --spacing 0.6 \
-  --report /data1/bone/eval/report_baseline_a.json
+  --report /data1/hyeonwoo/bone/eval/report_baseline_a.json
 
 python -m ai_bone.eval.evaluate \
-  --gt-dir /data1/bone/holdout/labels \
-  --pred-dir /data1/bone/predictions/merit_b \
+  --gt-dir /data1/hyeonwoo/bone/holdout/labels \
+  --pred-dir /data1/hyeonwoo/bone/predictions/merit_b \
   --spacing 0.6 \
-  --report /data1/bone/eval/report_merit_b.json
+  --report /data1/hyeonwoo/bone/eval/report_merit_b.json
 ```
 
 비교 요약 출력:
@@ -819,8 +819,8 @@ python -m ai_bone.eval.evaluate \
 ```bash
 python -c "
 import json
-a = json.load(open('/data1/bone/eval/report_baseline_a.json'))
-b = json.load(open('/data1/bone/eval/report_merit_b.json'))
+a = json.load(open('/data1/hyeonwoo/bone/eval/report_baseline_a.json'))
+b = json.load(open('/data1/hyeonwoo/bone/eval/report_merit_b.json'))
 print(f'{'Label':<15} {'Baseline_A Dice':>18} {'MERIT_B Dice':>14} {'Delta':>8}')
 print('-'*60)
 for name in a:
@@ -836,10 +836,10 @@ for name in a:
 
 ```bash
 python -m ai_bone.eval.evaluate \
-  --gt-dir /data1/bone/holdout/spinemets/labels \
-  --pred-dir /data1/bone/predictions/baseline_a/spinemets \
+  --gt-dir /data1/hyeonwoo/bone/holdout/spinemets/labels \
+  --pred-dir /data1/hyeonwoo/bone/predictions/baseline_a/spinemets \
   --spacing 0.6 \
-  --report /data1/bone/eval/report_baseline_a_spinemets.json
+  --report /data1/hyeonwoo/bone/eval/report_baseline_a_spinemets.json
 ```
 
 ### 8-D. Mako 데이터 정성 QC
@@ -851,14 +851,14 @@ python -m ai_bone.eval.evaluate \
 python ai_bone/infer_mako.py \
   --model-dir $nnUNet_results/Dataset510_AxialFT/\
 nnUNetTrainerNoMirroring_ES_PL__nnUNetPlans_iso06__3d_fullres \
-  --input /data1/bone/mako/raw \
-  --output /data1/bone/mako/predictions
+  --input /data1/hyeonwoo/bone/mako/raw \
+  --output /data1/hyeonwoo/bone/mako/predictions
 
 # QC 오버레이 생성
 python ai_bone/qc_overlay.py \
-  --ct-dir /data1/bone/mako/raw \
-  --seg-dir /data1/bone/mako/predictions \
-  --out-dir /data1/bone/mako/qc_png
+  --ct-dir /data1/hyeonwoo/bone/mako/raw \
+  --seg-dir /data1/hyeonwoo/bone/mako/predictions \
+  --out-dir /data1/hyeonwoo/bone/mako/qc_png
 ```
 
 ---
@@ -914,14 +914,14 @@ nohup으로 SSH 세션 종료 후에도 계속 실행:
 
 ```bash
 nohup bash ai_bone/train/stage1_pretrain.sh 0 \
-  > /data1/bone/logs/stage1_gpu0.log 2>&1 &
+  > /data1/hyeonwoo/bone/logs/stage1_gpu0.log 2>&1 &
 echo "PID: $!"
 ```
 
 진행 확인:
 
 ```bash
-tail -f /data1/bone/logs/stage1_gpu0.log
+tail -f /data1/hyeonwoo/bone/logs/stage1_gpu0.log
 ```
 
 ### 스크립트 요약표
@@ -939,13 +939,13 @@ tail -f /data1/bone/logs/stage1_gpu0.log
 | 항목 | 경로 |
 |---|---|
 | 작업 루트 | `/data1/bone` |
-| 원본 데이터 | `/data1/bone/raw/<dataset_name>/` |
-| nnUNet raw | `/data1/bone/nnunet/raw/` (= `$nnUNet_raw`) |
+| 원본 데이터 | `/data1/hyeonwoo/bone/raw/<dataset_name>/` |
+| nnUNet raw | `/data1/hyeonwoo/bone/nnunet/raw/` (= `$nnUNet_raw`) |
 | 전처리 캐시(SSD) | `/home/ubuntu/nnunet_pre/` (= `$nnUNet_preprocessed`) |
-| 학습 결과 | `/data1/bone/nnunet/results/` (= `$nnUNet_results`) |
-| MERIT 산출물 | `/data1/bone/merit/` |
-| 평가 리포트 | `/data1/bone/eval/` |
-| 로그 | `/data1/bone/logs/` |
+| 학습 결과 | `/data1/hyeonwoo/bone/nnunet/results/` (= `$nnUNet_results`) |
+| MERIT 산출물 | `/data1/hyeonwoo/bone/merit/` |
+| 평가 리포트 | `/data1/hyeonwoo/bone/eval/` |
+| 로그 | `/data1/hyeonwoo/bone/logs/` |
 
 ## 부록 B. 데이터셋 ID 매핑
 
@@ -987,7 +987,7 @@ GPU 학습/추론은 컨테이너로 돌립니다. 이미지 `bone-nnunet:2.8.1`
 - **단일 잡 = `ai_bone/train/docker_train.sh <GPU> <DID> <CFG> <FOLD> <TRAINER> [PRETRAINED]`**
   ```bash
   bash ai_bone/train/docker_train.sh 2 510 3d_fullres 0 nnUNetTrainerNoMirroring_ES_PL \
-    /data1/bone/nnunet/results/Dataset500_AxialPretrain/nnUNetTrainerNoMirroring_ES_PL__nnUNetPlans_iso06__3d_fullres/fold_all/checkpoint_final.pth
+    /data1/hyeonwoo/bone/nnunet/results/Dataset500_AxialPretrain/nnUNetTrainerNoMirroring_ES_PL__nnUNetPlans_iso06__3d_fullres/fold_all/checkpoint_final.pth
   ```
 - 여러 잡을 GPU에 나눠 돌릴 땐 각 GPU에 `docker_train.sh`를 순차로 넣는 래퍼를 쓰거나, `run_queue.sh`의 `nnUNetv2_train` 호출을 `docker_train.sh`로 바꾼 변형을 사용하십시오.
 - 아래 Phase 명령들의 `nnUNetv2_train ...`은 **conda 직접 실행 형태**이며(참고용), 실제로는 위 `docker_train.sh`로 감싸 실행합니다. 전처리·다운로드는 GPU가 없어 Docker 불필요.
@@ -996,8 +996,8 @@ GPU 학습/추론은 컨테이너로 돌립니다. 이미지 `bone-nnunet:2.8.1`
 단일 모델이라 큐로 나눌 수 없으니 **nnU-Net DDP로 2장을 한 모델에** 투입 → 두 GPU 모두 가동.
 ```bash
 source ~/miniforge3/etc/profile.d/conda.sh && conda activate pt210_py312
-export nnUNet_raw=/data1/bone/nnunet/raw nnUNet_preprocessed=/home/ubuntu/nnunet_pre \
-       nnUNet_results=/data1/bone/nnunet/results
+export nnUNet_raw=/data1/hyeonwoo/bone/nnunet/raw nnUNet_preprocessed=/home/ubuntu/nnunet_pre \
+       nnUNet_results=/data1/hyeonwoo/bone/nnunet/results
 export LD_LIBRARY_PATH=$CONDA_PREFIX/lib:$LD_LIBRARY_PATH nnUNet_compile=f nnUNet_n_proc_DA=32
 CUDA_VISIBLE_DEVICES=0,1 nnUNetv2_train 500 3d_fullres all \
   -p nnUNetPlans_iso06 -tr nnUNetTrainerNoMirroring_ES_PL -num_gpus 2 --c
@@ -1006,21 +1006,21 @@ CUDA_VISIBLE_DEVICES=0,1 nnUNetv2_train 500 3d_fullres all \
 ### Phase 2 — baseline 5 fold: 2 GPU 잡 큐
 `jobs_baseline.txt` (PRETRAINED = Phase1 결과 checkpoint):
 ```
-510 3d_fullres 0 nnUNetTrainerNoMirroring_ES_PL /data1/bone/nnunet/results/Dataset500_AxialPretrain/nnUNetTrainerNoMirroring_ES_PL__nnUNetPlans_iso06__3d_fullres/fold_all/checkpoint_final.pth
+510 3d_fullres 0 nnUNetTrainerNoMirroring_ES_PL /data1/hyeonwoo/bone/nnunet/results/Dataset500_AxialPretrain/nnUNetTrainerNoMirroring_ES_PL__nnUNetPlans_iso06__3d_fullres/fold_all/checkpoint_final.pth
 510 3d_fullres 1 nnUNetTrainerNoMirroring_ES_PL <같은 checkpoint>
 510 3d_fullres 2 nnUNetTrainerNoMirroring_ES_PL <같은 checkpoint>
 510 3d_fullres 3 nnUNetTrainerNoMirroring_ES_PL <같은 checkpoint>
 510 3d_fullres 4 nnUNetTrainerNoMirroring_ES_PL <같은 checkpoint>
 ```
 ```bash
-nohup bash ai_bone/train/run_queue.sh "0,1" jobs_baseline.txt > /data1/bone/train_logs/queue_baseline.log 2>&1 &
+nohup bash ai_bone/train/run_queue.sh "0,1" jobs_baseline.txt > /data1/hyeonwoo/bone/train_logs/queue_baseline.log 2>&1 &
 ```
 → fold를 GPU 0/1에 라운드로빈(3+2)으로 순차 실행, 각 GPU는 한 번에 한 모델(=풀 가동), `--c` 재개.
 
 ### Phase 3 — MERIT: split 후 파티션×fold 큐
 `estimate_conflict.py`→`split.py`로 `partitions.json`을 만들고, 파티션별로 `build_raw`로 `Dataset520/521…`을 만든 뒤, `jobs_merit.txt`에 `520/521 … fold0-4 nnUNetTrainerMERITFinetune <checkpoint>`를 넣어 동일하게:
 ```bash
-nohup bash ai_bone/train/run_queue.sh "0,1" jobs_merit.txt > /data1/bone/train_logs/queue_merit.log 2>&1 &
+nohup bash ai_bone/train/run_queue.sh "0,1" jobs_merit.txt > /data1/hyeonwoo/bone/train_logs/queue_merit.log 2>&1 &
 ```
 
 ### GPU 이용률(%)을 더 끌어올리는 레버

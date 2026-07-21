@@ -39,13 +39,14 @@
 - **디스크 구조 (중요)**:
   - `/` (`/dev/vda1`, 194G) = **Docker 루트(`/var/lib/docker`)가 여기 있어 잘 참**. 2026-07-17 기준 73%(53G 여유). 여기에 큰 파일 쓰지 말 것.
   - `/data1` (Lustre 네트워크 FS, 10T, 약 4T 여유) = **모든 데이터/전처리/결과는 여기**. 소파일 많으면 `du`/`cp`가 느림(정상).
+- **⚠️ 폴더 위치 (2026-07-21 재배치)**: 우리 프로젝트 루트 = **`/data1/hyeonwoo/bone`** (본인 이름 폴더). 원래 `/data1/bone`에 있었으나 **`/data1/bone`은 여러 사용자가 공유하는 폴더**(Sungyoon·mjgong 등 남의 것 포함)여서 우리 것만 `/data1/hyeonwoo/bone`으로 분리 이동함(같은 Lustre라 rename=즉시). **`/data1/bone`은 공유 영역이니 건드리지 말 것.** 단 하나 예외: **`/data1/bone/miniforge3`(공유 conda)** — 공유 GPU 모니터도 쓰므로 공유 위치에 그대로 두고 `~/miniforge3` 심볼릭 링크로 접근.
 - **주요 경로**:
-  - `/data1/bone/raw/<dataset>` — 원본 다운로드
-  - `/data1/bone/nnunet/raw/DatasetNNN_*` — 빌드된 nnU-Net raw 데이터셋
-  - `/data1/bone/nnunet/preprocessed/` — 전처리 결과 (Dataset520 + 옛 476/481/490)
-  - `/data1/bone/nnunet/results/` — 학습 결과(예정)
-  - `/data1/bone/build/` — **로컬 코드(ai_bone, docker)를 여기로 전송해서 Docker가 마운트해 실행**. run 스크립트들도 여기.
-  - `/data1/bone/tmp/` — 컨테이너 HOME/임시
+  - `/data1/hyeonwoo/bone/raw/<dataset>` — 원본 다운로드
+  - `/data1/hyeonwoo/bone/nnunet/raw/DatasetNNN_*` — 빌드된 nnU-Net raw 데이터셋
+  - `/data1/hyeonwoo/bone/nnunet/preprocessed/` — 전처리 결과 (Dataset520 + 옛 476/481/490)
+  - `/data1/hyeonwoo/bone/nnunet/results/` — 학습 결과(예정)
+  - `/data1/hyeonwoo/bone/build/` — **로컬 코드(ai_bone, docker)를 여기로 전송해서 Docker가 마운트해 실행**. run 스크립트들도 여기.
+  - `/data1/hyeonwoo/bone/tmp/` — 컨테이너 HOME/임시
   - `/data1/bone/miniforge3/` — conda 설치본(원래 `/home/ubuntu/miniforge3`였으나 디스크 확보로 이동, **심볼릭 링크 `/home/ubuntu/miniforge3 → /data1/bone/miniforge3`**). 학습 env `pt210_py312` (Python 3.12, **torch 2.10.0+cu126**), 그리고 `tf220_py312`.
     - ⚠️ 이 conda는 심볼릭 링크로 작동한다. `/home/ubuntu/miniforge3/...` 절대경로가 그대로 유효. 옮기거나 링크 건드리지 말 것.
   - `/data1/shared/gpu/gpu_monitor.py` — **공유 GPU 모니터**(팀 공용, 다른 사용자도 봄). ubuntu가 miniforge3 base python으로 실행 중. **죽이지 말 것.** (미니포지 이동 시 잠깐 재시작한 이력 있음.)
@@ -55,33 +56,33 @@
   - 베이스에 이미 있음: SimpleITK, scipy, numpy, nibabel, **pydicom 3.x**, **nnunetv2 CLI**(`nnUNetv2_*`), torch(GPU).
   - `docker/requirements.txt` 추가분: `requests, huggingface_hub, hf_transfer, scikit-image, matplotlib, gdown, osfclient, boto3`.
   - (주의) `pydicom-seg`는 pydicom 3.x와 비호환이라 **제거**함. DICOM-SEG는 pydicom 직접 파싱으로 처리(§4.6).
-- **표준 실행 패턴** (호스트 코드가 이미지 코드를 덮어쓰도록 `-w /data1/bone/build` 사용, 소유권 위해 `--user`, `/`를 안 건드리게 HOME/tmp를 /data1·RAM으로):
+- **표준 실행 패턴** (호스트 코드가 이미지 코드를 덮어쓰도록 `-w /data1/hyeonwoo/bone/build` 사용, 소유권 위해 `--user`, `/`를 안 건드리게 HOME/tmp를 /data1·RAM으로):
   ```bash
   docker run -d --name <NAME> --user "$(id -u):$(id -g)" \
-    -e HOME=/data1/bone/tmp --tmpfs /tmp:size=32g \
-    -v /data1:/data1 -w /data1/bone/build \
+    -e HOME=/data1/hyeonwoo/bone/tmp --tmpfs /tmp:size=32g \
+    -v /data1:/data1 -w /data1/hyeonwoo/bone/build \
     bone-pipeline:latest <command>
   ```
-  - `-w /data1/bone/build` 로 두면 `python -m ai_bone.*` 가 **전송된 최신 코드**를 씀(이미지 재빌드 불필요, 새 pip 의존성이 없을 때).
+  - `-w /data1/hyeonwoo/bone/build` 로 두면 `python -m ai_bone.*` 가 **전송된 최신 코드**를 씀(이미지 재빌드 불필요, 새 pip 의존성이 없을 때).
   - 새 pip 의존성을 넣었을 때만 이미지 재빌드 필요.
 - **코드 전송 방법**(로컬 → 서버 빌드 디렉토리). ⚠️ `ai_bone/data`(30G)·`ai_bone/nnunet`을 반드시 제외(안 하면 tar가 hang/디스크 폭발):
   ```bash
   KEY=~/ad067.pem
   tar czf - --exclude 'ai_bone/data' --exclude 'ai_bone/nnunet' \
     --exclude '__pycache__' --exclude '*.pyc' ai_bone docker \
-  | ssh -i "$KEY" ubuntu@114.110.134.100 'cd /data1/bone/build && tar xzf -'
+  | ssh -i "$KEY" ubuntu@114.110.134.100 'cd /data1/hyeonwoo/bone/build && tar xzf -'
   ```
 - **이미지 재빌드**(requirements 바뀔 때만):
   ```bash
   ssh -i ~/ad067.pem ubuntu@114.110.134.100 \
-   'cd /data1/bone/build && cp docker/.dockerignore .dockerignore \
-    && timeout 500 docker build -t bone-pipeline:latest -f docker/Dockerfile . >/data1/bone/rebuild.log 2>&1 && echo OK'
+   'cd /data1/hyeonwoo/bone/build && cp docker/.dockerignore .dockerignore \
+    && timeout 500 docker build -t bone-pipeline:latest -f docker/Dockerfile . >/data1/hyeonwoo/bone/rebuild.log 2>&1 && echo OK'
   ```
-  - ⚠️ `.dockerignore`는 **빌드 컨텍스트 루트(`/data1/bone/build/.dockerignore`)**에 있어야 적용됨(`docker/`에 있으면 무시됨). 내용: `ai_bone/data`, `ai_bone/nnunet`, `**/__pycache__`, `*.pyc`, `*.zip`, `*.tar.gz`.
+  - ⚠️ `.dockerignore`는 **빌드 컨텍스트 루트(`/data1/hyeonwoo/bone/build/.dockerignore`)**에 있어야 적용됨(`docker/`에 있으면 무시됨). 내용: `ai_bone/data`, `ai_bone/nnunet`, `**/__pycache__`, `*.pyc`, `*.zip`, `*.tar.gz`.
 
 ### 1.4 SSH 실행 팁(겪은 이슈)
 - 각 SSH 호출은 도구 타임아웃(기본 2분, 최대 10분)이 있음. **긴 작업은 `docker run -d`(detached)로 띄우고 폴링**한다.
-- 백그라운드 쉘 작업은 `nohup ... & ` + 완료 플래그 파일 패턴 사용(예: `&& touch /data1/bone/x.done`), `pkill`은 SSH 세션을 끊을 수 있으니 스크립트-파일 패턴 권장.
+- 백그라운드 쉘 작업은 `nohup ... & ` + 완료 플래그 파일 패턴 사용(예: `&& touch /data1/hyeonwoo/bone/x.done`), `pkill`은 SSH 세션을 끊을 수 있으니 스크립트-파일 패턴 권장.
 - 거대한 로그(전처리 config 한 줄이 수백 KB) 때문에 `docker logs | tail`이 잘림 → **`grep -c PREPROCESS_DONE` 같은 표적 검색**으로 확인.
 - Lustre에서 `du`/`find`가 느려 타임아웃 나면 완료 플래그·`pgrep`만 가볍게 확인.
 
@@ -137,7 +138,7 @@
 
 ## 3. 데이터셋 (전부 빌드 완료)
 
-빌드된 nnU-Net raw 데이터셋 (`/data1/bone/nnunet/raw/`):
+빌드된 nnU-Net raw 데이터셋 (`/data1/hyeonwoo/bone/nnunet/raw/`):
 
 | Dataset | 케이스 | 내용 | 소스/방식 | build overlap-thr |
 |---|---|---|---|---|
@@ -164,9 +165,9 @@
 
 ### 3.2 다운로드 방식 (`ai_bone/download.py` + `ai_bone/datasets/sources.py`)
 `download_dataset(name, dest_root, ...)` 지원 method: `zenodo`, `huggingface`, `gdrive`(gdown), `osf`(osfclient), **`http`**(직접 URL, resumable), `manual`.
-- 예: `docker run ... bone-pipeline python -m ai_bone.download <name> --dest /data1/bone/raw [--max-workers 4] [--allow <glob>]`
+- 예: `docker run ... bone-pipeline python -m ai_bone.download <name> --dest /data1/hyeonwoo/bone/raw [--max-workers 4] [--allow <glob>]`
 - **verse**: osfclient가 403(OSF 큰 파일 외부 스토리지) → **bonescreen S3 직접 zip 6개**(http)로 전환. URL: `https://s3.bonescreen.de/public/VerSe-complete/dataset-verse{19,20}{training,validation,test}.zip`. 총 48G(압축), 374 스캔.
-- **spinemets**: metadata.csv의 `s3://idc-open-data/<uuid>/*`를 boto3 익명(`UNSIGNED`)으로 다운로드. 스크립트 `/data1/bone/build/idc_download.py`(ThreadPoolExecutor 24). 35582 dcm, 19G.
+- **spinemets**: metadata.csv의 `s3://idc-open-data/<uuid>/*`를 boto3 익명(`UNSIGNED`)으로 다운로드. 스크립트 `/data1/hyeonwoo/bone/build/idc_download.py`(ThreadPoolExecutor 24). 35582 dcm, 19G.
 
 ---
 
@@ -191,7 +192,7 @@
 - `build_raw.py` — `build_from_pairs(pairs, lm, raw_dir, spacing=0.6, hu_thr=200, workers=16, overlap_thr=0.5)`: 페어별 읽기→harmonize→verify→`imagesTr/<cid>_0000.nii.gz`+`labelsTr/<cid>.nii.gz`+present sidecar 쓰기. `write_dataset_json`(ignore=54). CLI `--pairs --dataset --out --workers --overlap-thr`.
 
 ### 4.4 전처리 / 플랜
-- `make_iso06_plan.py` — 등방 0.6mm 플랜 `nnUNetPlans_iso06.json` 생성. Dataset476의 검증된 iso06 3d_fullres 설정(patch [224,80,128], batch 2)을 계승, 없으면 spacing만 0.6 override. **476 템플릿이 `/data1/bone/nnunet/preprocessed/Dataset476_PelvisThighs/`에 있어 정식 계승됨.**
+- `make_iso06_plan.py` — 등방 0.6mm 플랜 `nnUNetPlans_iso06.json` 생성. Dataset476의 검증된 iso06 3d_fullres 설정(patch [224,80,128], batch 2)을 계승, 없으면 spacing만 0.6 override. **476 템플릿이 `/data1/hyeonwoo/bone/nnunet/preprocessed/Dataset476_PelvisThighs/`에 있어 정식 계승됨.**
 
 ### 4.5 MERIT / eval / train — §2.3, §2.4 참고. train/:
 - `partial_label_trainer.py`, `merit_finetune_trainer.py`, `marginal_loss.py`, `marginal_trainer.py`(GPU에서 train_step 배선 마무리), `docker_train.sh`, `run_queue.sh`, `stage1_pretrain.sh`, `stage2_baseline.sh`.
@@ -208,22 +209,22 @@
 
 ## 5. 재현: 각 데이터셋 build 명령 (전부 완료됐지만 재실행용)
 
-전제: 코드 전송(§1.3) + `/data1/bone/raw/<원본>` 존재. 전부 detached Docker.
+전제: 코드 전송(§1.3) + `/data1/hyeonwoo/bone/raw/<원본>` 존재. 전부 detached Docker.
 
 ```bash
 # 공통 헤더
 KEY=~/ad067.pem; H='ssh -i '"$KEY"' ubuntu@114.110.134.100'
-U='--user "$(id -u):$(id -g)" -e HOME=/data1/bone/tmp -v /data1:/data1 -w /data1/bone/build bone-pipeline:latest'
+U='--user "$(id -u):$(id -g)" -e HOME=/data1/hyeonwoo/bone/tmp -v /data1:/data1 -w /data1/hyeonwoo/bone/build bone-pipeline:latest'
 
-# --- RibSeg (Dataset513) : /data1/bone/build/run_ribseg.sh ---
+# --- RibSeg (Dataset513) : /data1/hyeonwoo/bone/build/run_ribseg.sh ---
 #  unzip RibFrac 이미지 → make_pairs(ribseg) → build_raw(overlap 0.3)
-#  ct-root=/data1/bone/raw/ribfrac_ct/images, mask-root=.../ribseg/extracted/ribseg_v2/seg
+#  ct-root=/data1/hyeonwoo/bone/raw/ribfrac_ct/images, mask-root=.../ribseg/extracted/ribseg_v2/seg
 
 # --- CTSpine1K (Dataset514) : run_ctspine.sh ---
 #  make_pairs(ctspine1k) ct-root=raw_data/volumes mask-root=raw_data/labels → build_raw(0.3)
 
 # --- VerSe (Dataset515) : run_verse.sh ---
-#  make_pairs(verse) --root /data1/bone/raw/verse/extracted → build_raw(0.3)
+#  make_pairs(verse) --root /data1/hyeonwoo/bone/raw/verse/extracted → build_raw(0.3)
 #  (추출은 verse_extract_scan.py: *_ct.nii.gz + *_seg-vert_msk.nii.gz만 풀고 __MACOSX 제외)
 
 # --- Spine-Mets (Dataset516) : run_spinemets.sh ---
@@ -231,27 +232,27 @@ U='--user "$(id -u):$(id -g)" -e HOME=/data1/bone/tmp -v /data1:/data1 -w /data1
 
 # --- 통합 병합 (Dataset520) ---
 docker run -d --name merge_ft $U python -m ai_bone.datasets.merge_raw \
-  --out /data1/bone/nnunet/raw/Dataset520_UnifiedFT \
-  --sources totalseg=/data1/bone/nnunet/raw/Dataset512_TotalSeg \
-    ctpelvic1k=/data1/bone/nnunet/raw/Dataset511_CTPelvic1K \
-    ribseg=/data1/bone/nnunet/raw/Dataset513_RibSeg \
-    ctspine1k=/data1/bone/nnunet/raw/Dataset514_CTSpine1K \
-    verse=/data1/bone/nnunet/raw/Dataset515_VerSe \
-    spinemets=/data1/bone/nnunet/raw/Dataset516_SpineMets
+  --out /data1/hyeonwoo/bone/nnunet/raw/Dataset520_UnifiedFT \
+  --sources totalseg=/data1/hyeonwoo/bone/nnunet/raw/Dataset512_TotalSeg \
+    ctpelvic1k=/data1/hyeonwoo/bone/nnunet/raw/Dataset511_CTPelvic1K \
+    ribseg=/data1/hyeonwoo/bone/nnunet/raw/Dataset513_RibSeg \
+    ctspine1k=/data1/hyeonwoo/bone/nnunet/raw/Dataset514_CTSpine1K \
+    verse=/data1/hyeonwoo/bone/nnunet/raw/Dataset515_VerSe \
+    spinemets=/data1/hyeonwoo/bone/nnunet/raw/Dataset516_SpineMets
 ```
-서버에 실제 run 스크립트들이 `/data1/bone/build/` 에 남아있음: `run_ribseg.sh`, `run_ctspine.sh`, `run_verse.sh`, `run_spinemets.sh`, `run_preprocess.sh`, `idc_download.py`, `relabel_ignore.py`, `verse_extract_scan.py`, `scan_ctspine.py`.
+서버에 실제 run 스크립트들이 `/data1/hyeonwoo/bone/build/` 에 남아있음: `run_ribseg.sh`, `run_ctspine.sh`, `run_verse.sh`, `run_spinemets.sh`, `run_preprocess.sh`, `idc_download.py`, `relabel_ignore.py`, `verse_extract_scan.py`, `scan_ctspine.py`.
 
 ---
 
 ## 6. 전처리 (완료) — Dataset520 iso 0.6mm
 
-스크립트 `/data1/bone/build/run_preprocess.sh` (핵심: **nnUNet_preprocessed를 /data1로**, `/tmp`는 RAM tmpfs로 → `/`를 안 건드림):
+스크립트 `/data1/hyeonwoo/bone/build/run_preprocess.sh` (핵심: **nnUNet_preprocessed를 /data1로**, `/tmp`는 RAM tmpfs로 → `/`를 안 건드림):
 ```bash
-export nnUNet_raw=/data1/bone/nnunet/raw
-export nnUNet_preprocessed=/data1/bone/nnunet/preprocessed
-export nnUNet_results=/data1/bone/nnunet/results
-export nnUNet_compile=f HOME=/data1/bone/tmp MPLCONFIGDIR=/data1/bone/tmp
-cd /data1/bone/build
+export nnUNet_raw=/data1/hyeonwoo/bone/nnunet/raw
+export nnUNet_preprocessed=/data1/hyeonwoo/bone/nnunet/preprocessed
+export nnUNet_results=/data1/hyeonwoo/bone/nnunet/results
+export nnUNet_compile=f HOME=/data1/hyeonwoo/bone/tmp MPLCONFIGDIR=/data1/hyeonwoo/bone/tmp
+cd /data1/hyeonwoo/bone/build
 nnUNetv2_extract_fingerprint -d 520 --verify_dataset_integrity -np 16
 nnUNetv2_plan_experiment -d 520
 python ai_bone/make_iso06_plan.py 520          # → nnUNetPlans_iso06.json (476 템플릿 계승)
@@ -260,10 +261,10 @@ nnUNetv2_preprocess -d 520 -plans_name nnUNetPlans_iso06 -c 3d_fullres -np 16
 실행:
 ```bash
 docker run -d --name preprocess --user "$(id -u):$(id -g)" --tmpfs /tmp:size=32g \
-  -e HOME=/data1/bone/tmp -v /data1:/data1 -w /data1/bone/build \
-  bone-pipeline:latest bash /data1/bone/build/run_preprocess.sh
+  -e HOME=/data1/hyeonwoo/bone/tmp -v /data1:/data1 -w /data1/hyeonwoo/bone/build \
+  bone-pipeline:latest bash /data1/hyeonwoo/bone/build/run_preprocess.sh
 ```
-**결과(검증됨)**: `PREPROCESS_DONE`, 에러 0. `/data1/bone/nnunet/preprocessed/Dataset520_UnifiedFT/`:
+**결과(검증됨)**: `PREPROCESS_DONE`, 에러 0. `/data1/hyeonwoo/bone/nnunet/preprocessed/Dataset520_UnifiedFT/`:
 - `nnUNetPlans_iso06_3d_fullres/` 에 **6510 `.b2nd`(3255케이스 × data+seg) + 3255 `.pkl`**, 총 **1.1T**.
 - 설정: patch **[224,80,128]**, spacing **[0.6,0.6,0.6]**, batch **2**, CTNormalization, PlainConvUNet 6-stage, InstanceNorm3d.
 
@@ -276,26 +277,26 @@ docker run -d --name preprocess --user "$(id -u):$(id -g)" --tmpfs /tmp:size=32g
 ### 7.0 학습 전 준비 상태 (2026-07-17 갱신)
 GPU-free 준비물은 **완료**됨(커밋 `f19485a`, 108 테스트):
 - ✅ **marginal 부분라벨 trainer 완성** (`nnUNetTrainerMarginal`): loss 벡터화 + **ignore(54) 복셀 마스킹** + present.json을 **RAW labelsTr**에서 로드 + nnU-Net DS 래퍼 재사용 + train/validation_step에서 present stash. **이미지에서 import·discovery 검증됨**(MRO: Marginal→NoMirroring_ES_PL→ES→NoMirroring; `recursive_find_python_class`로 `-tr nnUNetTrainerMarginal` 발견 확인). Dockerfile에 등록 완료 → **이미지 재빌드 완료**(marginal_trainer가 nnunetv2에 baked-in).
-- ✅ **CV splits 생성 완료**: `ai_bone/train/make_splits.py` → `/data1/bone/nnunet/preprocessed/Dataset520_UnifiedFT/splits_final.json`(+`test_ids.json`). **trainpool 2721 / test 534**(Spine-Mets 54 전부 도메인 홀드아웃 + 나머지 15% test, fold별 val은 데이터셋 stratified).
+- ✅ **CV splits 생성 완료**: `ai_bone/train/make_splits.py` → `/data1/hyeonwoo/bone/nnunet/preprocessed/Dataset520_UnifiedFT/splits_final.json`(+`test_ids.json`). **trainpool 2721 / test 534**(Spine-Mets 54 전부 도메인 홀드아웃 + 나머지 15% test, fold별 val은 데이터셋 stratified).
 
 **남은 것 = GPU 필요**:
 - ⏳ **1-epoch 스모크 테스트**(GPU): `batch['keys']`가 case id를 담는지, marginal loss+present mask+DS가 end-to-end 도는지, whole-body 0.6mm patch [224,80,128]·batch2 **VRAM** 확인. `train_step`/`validation_step`이 nnU-Net 2.8.1 API와 정확히 맞는지 최종 확인(runbook §7).
 - ⏳ **CADS 사전학습 θ0**(아래).
 
 준비되면 순서:
-1. **CADS 사전학습 데이터 정비**: `/data1/bone/raw/cads`에 52G/24814파일(SAROS/CT-ORG/AMOS subset) 있음(다운로드가 hung이라 kill함). CADS는 per-structure 바이너리 → `part_NNN`→구조 매핑 표가 필요(아직 미정, `combine.py` 확장 필요). 부족하면 Docker로 `python -m ai_bone.download cads --allow <shard>` 재개.
+1. **CADS 사전학습 데이터 정비**: `/data1/hyeonwoo/bone/raw/cads`에 52G/24814파일(SAROS/CT-ORG/AMOS subset) 있음(다운로드가 hung이라 kill함). CADS는 per-structure 바이너리 → `part_NNN`→구조 매핑 표가 필요(아직 미정, `combine.py` 확장 필요). 부족하면 Docker로 `python -m ai_bone.download cads --allow <shard>` 재개.
 2. **사전학습(Stage1)**: CADS 의사라벨로 θ0 학습 → `Dataset500_AxialPretrain`(예정). `stage1_pretrain.sh` 참고.
 3. **Fine-tuning(Stage2)**: Dataset520, plan `nnUNetPlans_iso06`, trainer는 **marginal 부분라벨**(`nnUNetTrainerMarginal`) + NoMirroring. 예시(stage2_baseline.sh, 단 baseline은 joint):
    ```bash
    CUDA_VISIBLE_DEVICES=<GPU> nnUNetv2_train 520 3d_fullres <FOLD> \
      -p nnUNetPlans_iso06 -tr nnUNetTrainerMarginal \
-     -pretrained_weights /data1/bone/nnunet/results/Dataset500_.../checkpoint_final.pth --c
+     -pretrained_weights /data1/hyeonwoo/bone/nnunet/results/Dataset500_.../checkpoint_final.pth --c
    ```
    - **반드시 Docker(GPU 옵션)로.** `train/docker_train.sh` 참고(bone-pipeline, bind-mount 없이).
    - `marginal_trainer.py`의 train_step(deep supervision/AMP)을 GPU에서 마무리.
 4. **MERIT 실험** (오케스트레이션 코드 완비, GPU-free 검증됨):
    - **분할 3전략** `ai_bone/merit/orchestrate.py`: `assign_conflict`(gradient PCA, estimate_conflict 필요=GPU) / `assign_anatomy`(척추·늑골·골반·전신, GPU 불필요) / `assign_random`. `build(strategy,...)` → `branch_folds`(entry b = branch b, nnU-Net `fold=b`로 그 브랜치 데이터만 학습) + `merge_weights`(train case 수).
-   - **생성된 아티팩트**(서버 `/data1/bone/nnunet/merit/`): `anatomy.json`(4브랜치: 골반67·늑골337·척추937·전신834), `random.json`(2브랜치). conflict는 θ0 있어야 생성.
+   - **생성된 아티팩트**(서버 `/data1/hyeonwoo/bone/nnunet/merit/`): `anatomy.json`(4브랜치: 골반67·늑골337·척추937·전신834), `random.json`(2브랜치). conflict는 θ0 있어야 생성.
    - **브랜치 학습**: `branch_folds`를 splits로 써서 각 브랜치 학습(GPU). **병합**: `ai_bone/merit/merge_checkpoints.py`로 N개 .pth를 case-가중 평균(dtype-safe) 또는 TIES 병합 → 단일 체크포인트. CLI가 orchestrate 아티팩트의 merge_weights 사용.
    - baseline(joint/anatomy/random/soups) 대비 비교. `merge_diagnostics.py`로 진단(LMC/displacement/perturbation).
 5. **평가**: `eval/evaluate.py`로 DSC/NSD/HD95/PQ/L-R swap 등, region/difficulty별. VerSe 등은 instance metric.
@@ -315,7 +316,7 @@ GPU-free 준비물은 **완료**됨(커밋 `f19485a`, 108 테스트):
 | TotalSeg combine ITK 오류 | 비직교 방향코사인(2e-4) | `nifti_io.read_sitk` nibabel fallback+정규화 |
 | TotalSeg 다수 SKIP | 전체뼈 마스크에 저HU 골수 포함 | `--overlap-thr 0.25` |
 | 컨테이너 root 소유 파일 | 컨테이너 root 실행 | `--user $(id -u):$(id -g)` |
-| Docker "No module ai_bone.*" | `-w /data1/bone/bone`가 호스트 코드로 이미지 shadow | `-w /data1/bone/build` |
+| Docker "No module ai_bone.*" | `-w /data1/hyeonwoo/bone/bone`가 호스트 코드로 이미지 shadow | `-w /data1/hyeonwoo/bone/build` |
 | Zenodo 대용량 zip 중단 | 연결 끊김 | `download_file` retry+resume+size verify |
 | `/` 100% full | nnunet_pre(30G)+miniforge3(23G)가 `/home`(=`/`)에 | /data1로 이동(miniforge는 심볼릭 링크), 공유 이미지(115G)는 남의 것이라 못 지움 |
 | tar 전송 hang | `ai_bone/data`(30G) 포함됨 | tar에서 `ai_bone/data`,`ai_bone/nnunet` 제외 |
@@ -356,9 +357,9 @@ cd64d1d feat: marginal loss for partial-label multi-dataset training
 ```bash
 KEY=~/ad067.pem; SSH="ssh -i $KEY ubuntu@114.110.134.100"
 # 1) 빌드된 데이터셋
-$SSH 'for d in 511 512 513 514 515 516 520; do echo -n "Dataset$d: "; ls /data1/bone/nnunet/raw/Dataset${d}_*/labelsTr/*.nii.gz 2>/dev/null | wc -l; done'
+$SSH 'for d in 511 512 513 514 515 516 520; do echo -n "Dataset$d: "; ls /data1/hyeonwoo/bone/nnunet/raw/Dataset${d}_*/labelsTr/*.nii.gz 2>/dev/null | wc -l; done'
 # 2) 전처리 산출물
-$SSH 'ls /data1/bone/nnunet/preprocessed/Dataset520_UnifiedFT/nnUNetPlans_iso06_3d_fullres/*.b2nd | wc -l'   # 6510 기대
+$SSH 'ls /data1/hyeonwoo/bone/nnunet/preprocessed/Dataset520_UnifiedFT/nnUNetPlans_iso06_3d_fullres/*.b2nd | wc -l'   # 6510 기대
 # 3) 디스크
 $SSH 'df -h / /data1 | grep -vE "tmpfs|udev"'
 # 4) conda(심볼릭 링크) 정상
